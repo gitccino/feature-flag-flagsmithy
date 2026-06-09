@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { sanitizeCallbackURL, withCallbackURL } from "@/lib/auth/callback-url";
 import { type SignUpInput, signUpSchema } from "@/lib/zod-schema";
 import { signUp } from "@/lib/auth-client";
 import { Input } from "@/components/ui/input";
@@ -16,11 +17,10 @@ import {
 import { Button } from "@/components/ui/button";
 
 export default function SignUpPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackURL = searchParams.get("callbackURL") ?? "/";
-  const redirectTo =
-    callbackURL && callbackURL.startsWith("/") ? callbackURL : "/";
+  const redirectTo = sanitizeCallbackURL(
+    searchParams.get("callbackURL") ?? "/",
+  );
 
   const {
     control,
@@ -37,18 +37,14 @@ export default function SignUpPage() {
       name: data.name,
       email: data.email,
       password: data.password,
-      callbackURL,
+      callbackURL: redirectTo,
     });
     if (error) {
       setError("root", { message: `*${error.message}` });
       return;
     }
     // signUp.email does not return redirect/url like signIn.email — redirect manually
-    // window.location.assign(redirectTo);
-
-    // ——— OR ———
-    router.push(redirectTo);
-    router.refresh();
+    window.location.assign(redirectTo);
   });
 
   return (
@@ -58,7 +54,7 @@ export default function SignUpPage() {
         <p className="text-muted-foreground mt-1 text-sm">
           Already have one?{" "}
           <Link
-            href="/sign-in"
+            href={withCallbackURL("/sign-in", redirectTo)}
             className="text-primary ml-2 underline underline-offset-4"
           >
             Sign in

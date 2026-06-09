@@ -15,4 +15,8 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  baseURL: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3700",
 });
+
+export type Session = typeof auth.$Infer.Session;
+export type UserSession = Session["user"];

@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { sanitizeCallbackURL, withCallbackURL } from "@/lib/auth/callback-url";
 import { type SignInInput, signInSchema } from "@/lib/zod-schema";
 import { signIn } from "@/lib/auth-client";
 import { Label } from "@/components/ui/label";
@@ -17,7 +19,10 @@ import { Button } from "@/components/ui/button";
 // import { useState } from 'react';
 
 export default function SignInPage() {
-  // const [authError, setAuthError] = useState<string | null>(null)
+  const searchParams = useSearchParams();
+  const redirectTo = sanitizeCallbackURL(
+    searchParams.get("callbackURL") ?? "/",
+  );
 
   const {
     register,
@@ -27,17 +32,16 @@ export default function SignInPage() {
     formState: { errors, isSubmitting, isValid },
   } = useForm<SignInInput>({
     resolver: zodResolver(signInSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { email: "hello@flagsmithy.com", password: "password" },
   });
 
   const onSubmit = handleSubmit(async (data) => {
     // setAuthError(null)
 
-    console.log("Data:", data);
-    const { data: session, error } = await signIn.email({
+    const { error } = await signIn.email({
       email: data.email,
       password: data.password,
-      callbackURL: "/",
+      callbackURL: redirectTo,
     });
     if (error) {
       setError("root", { message: `*${error.message}` });
@@ -51,7 +55,7 @@ export default function SignInPage() {
         <p className="text-muted-foreground mt-1 text-sm">
           Don&apos;t have an account?{" "}
           <Link
-            href="/sign-up"
+            href={withCallbackURL("/sign-up", redirectTo)}
             className="text-primary ml-2 underline underline-offset-4"
           >
             Create one
