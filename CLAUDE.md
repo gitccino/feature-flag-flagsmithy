@@ -10,15 +10,15 @@ Self-hostable **feature flag platform** on the Next.js App Router. Per-environme
 
 ## Tech Stack
 
-| Layer | Technology | Docs |
-| --- | --- | --- |
-| Framework | Next.js 16 (App Router, Server Actions, React 19.2 + React Compiler) | https://nextjs.org/docs |
-| Language | TypeScript (strict) | https://www.typescriptlang.org/docs/ |
-| Database | PostgreSQL via Neon serverless + Drizzle ORM | https://orm.drizzle.team/docs · https://neon.tech/docs |
-| Auth | Better Auth (email + password) | https://www.better-auth.com/docs |
-| Cache / Rate limiting | Upstash Redis + `@upstash/ratelimit` | https://upstash.com/docs/redis · https://upstash.com/docs/redis/sdks/ratelimit-ts |
-| UI | Radix UI + shadcn/ui, Tailwind CSS v4, Lucide icons | https://ui.shadcn.com · https://www.radix-ui.com · https://tailwindcss.com/docs |
-| Validation | Zod | https://zod.dev |
+| Layer                 | Technology                                                           | Docs                                                                              |
+| --------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Framework             | Next.js 16 (App Router, Server Actions, React 19.2 + React Compiler) | https://nextjs.org/docs                                                           |
+| Language              | TypeScript (strict)                                                  | https://www.typescriptlang.org/docs/                                              |
+| Database              | PostgreSQL via Neon serverless + Drizzle ORM                         | https://orm.drizzle.team/docs · https://neon.tech/docs                            |
+| Auth                  | Better Auth (email + password)                                       | https://www.better-auth.com/docs                                                  |
+| Cache / Rate limiting | Upstash Redis + `@upstash/ratelimit`                                 | https://upstash.com/docs/redis · https://upstash.com/docs/redis/sdks/ratelimit-ts |
+| UI                    | Radix UI + shadcn/ui, Tailwind CSS v4, Lucide icons                  | https://ui.shadcn.com · https://www.radix-ui.com · https://tailwindcss.com/docs   |
+| Validation            | Zod                                                                  | https://zod.dev                                                                   |
 
 Package manager: **Bun** (`bun.lock`). Use `bun install`, `bun add <pkg>`, `bun run <script>`.
 
@@ -32,7 +32,7 @@ Scripts: `bun run dev`, `bun run build`, `bun run start`, `bun run lint`.
 2. **Mutations go through Server Actions.** Use `"use server"` functions for all writes. Do not build internal REST endpoints for first-party UI mutations — Route Handlers are reserved for the public API (e.g. flag evaluation) and webhooks.
 3. **Type safety everywhere.** No `any`. Derive types from the source of truth: infer DB types from Drizzle schemas, infer input/output types from Zod schemas (`z.infer<...>`). Prefer `unknown` + a Zod parse over loose casts.
 4. **Validate at every boundary.** Every Server Action argument, Route Handler body/params, and external payload must be parsed with Zod before use. Never trust client input.
-5. **Security is not optional in Proxy.** Proxy/middleware is for optimistic checks only. Always re-verify auth and authorization *inside* each Server Action and protected Route Handler — never rely on Proxy matchers alone (a refactor can silently drop coverage).
+5. **Security is not optional in Proxy.** Proxy/middleware is for optimistic checks only. Always re-verify auth and authorization _inside_ each Server Action and protected Route Handler — never rely on Proxy matchers alone (a refactor can silently drop coverage).
 6. **Fail safe and explicit.** Server Actions return typed result objects (e.g. `{ ok: true, data } | { ok: false, error }`) rather than throwing across the client boundary. Surface user-facing errors via Sonner toasts.
 7. **Audit every admin mutation.** Persisting a change to flags, segments, environments, or API keys must also write an audit log entry (actor, request, environment, scope, before/after diff).
 8. **Cache deliberately, invalidate precisely.** Tag cached reads with `cacheTag`; invalidate with `updateTag` (read-your-writes in Server Actions) or `revalidateTag(tag, profile)`. Keep Redis as the hot path for public flag evaluation.
@@ -97,6 +97,14 @@ Run `bunx next typegen` to generate `PageProps` / `LayoutProps` / `RouteContext`
 - `next/image`: use `images.remotePatterns` (not the deprecated `images.domains`).
 - `serverRuntimeConfig` / `publicRuntimeConfig` are removed — use env vars (`process.env`, `NEXT_PUBLIC_*`).
 - React Compiler is available (`reactCompiler: true` in `next.config.ts`) — don't hand-add `useMemo`/`useCallback` for micro-optimizations it would handle.
+
+---
+
+## Zod v4 — External documenataion
+
+Zod v4 Release notes: https://zod.dev/v4
+Zod v4 Formatting errors: https://zod.dev/error-formatting
+Zod v4 migration guide: https://zod.dev/v4/changelog
 
 ---
 
