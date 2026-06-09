@@ -1,36 +1,29 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Flagsmithy
 
-## Getting Started
+A self-hostable **feature flag platform** built on the Next.js App Router. Flagsmithy lets you ship features behind flags, roll them out gradually by percentage, target specific user segments, and evaluate everything per-environment through a fast, cache-backed API — with a full audit trail of every change.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Highlights
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Per-environment flags** — every flag has independent state (`development`, `staging`, `production`) so a flag can be on in staging and off in production.
+- **Rollout strategies** — flip a flag as a simple boolean kill-switch, or roll it out to a deterministic percentage of users.
+- **Segment targeting** — build reusable user segments from trait conditions (`plan = pro`, `country in [TH, SG]`, …) and attach prioritized rules to a flag.
+- **Public evaluation API** — `GET`/`POST /api/flags/:key` authenticated by environment-scoped API keys, with Redis caching and per-project rate limiting.
+- **Audit logging** — every admin mutation is recorded with actor, request, environment, scope, and before/after diffs, queryable from the settings page.
+- **Admin dashboard** — manage flags, segments, environments, and API keys behind email/password auth.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Tech Stack
 
-## Learn More
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Layer                 | Technology                                                                                      |
+| --------------------- | ----------------------------------------------------------------------------------------------- |
+| Framework             | [Next.js 16](https://nextjs.org/) (App Router, Server Actions, React 19 + React Compiler)       |
+| Language              | TypeScript                                                                                      |
+| Database              | PostgreSQL via [Neon serverless](https://neon.tech/) + [Drizzle ORM](https://orm.drizzle.team/) |
+| Auth                  | [Better Auth](https://www.better-auth.com/) (email + password)                                  |
+| Cache / Rate limiting | [Upstash Redis](https://upstash.com/) + `@upstash/ratelimit`                                    |
+| UI                    | Radix UI + shadcn, Tailwind CSS v4, Lucide icons, Sonner toasts                                 |
+| Validation            | Zod                                                                                             |
