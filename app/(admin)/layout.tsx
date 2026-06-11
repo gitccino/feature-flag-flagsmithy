@@ -6,13 +6,8 @@ import { buildSignInPath } from "@/lib/auth/callback-url";
 import { auth } from "@/lib/auth";
 import ProfileMenu from "@/components/navbar/profile-menu";
 
-export default async function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+async function requireSession() {
   const headersList = await headers();
-
   const session = await auth.api.getSession({
     headers: headersList,
   });
@@ -21,7 +16,15 @@ export default async function AdminLayout({
     const pathname = headersList.get("x-pathname") ?? "/";
     redirect(buildSignInPath(pathname));
   }
+  return session;
+}
 
+export default async function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const session = await requireSession();
   return (
     <div className="mx-auto max-w-6xl">
       <header className="sticky top-0 z-10 flex w-full items-center border-b-0 px-2 py-2">

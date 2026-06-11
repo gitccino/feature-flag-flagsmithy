@@ -19,7 +19,7 @@ export async function authenticateUser(data: SignInInput) {
     // Example: call your provider like Auth.js, Better Auth, or database validation
 
     return { success: true };
-  } catch (error) {
+  } catch {
     return {
       success: false,
       message: "Invalid credentials. Please try again.",

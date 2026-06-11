@@ -7,7 +7,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { sanitizeCallbackURL, withCallbackURL } from "@/lib/auth/callback-url";
 import { type SignInInput, signInSchema } from "@/lib/zod-schema";
 import { signIn } from "@/lib/auth-client";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
   Field,
@@ -19,17 +18,17 @@ import { Button } from "@/components/ui/button";
 // import { useState } from 'react';
 
 export default function SignInPage() {
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParams(); // searchParams.get("callbackURL") -> /segments
   const redirectTo = sanitizeCallbackURL(
     searchParams.get("callbackURL") ?? "/",
   );
 
   const {
-    register,
+    // register,
     control,
     handleSubmit,
     setError,
-    formState: { errors, isSubmitting, isValid },
+    formState: { errors, isSubmitting }, // isValid
   } = useForm<SignInInput>({
     resolver: zodResolver(signInSchema),
     defaultValues: { email: "hello@flagsmithy.com", password: "password" },
