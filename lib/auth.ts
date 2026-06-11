@@ -1,0 +1,22 @@
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "@better-auth/drizzle-adapter";
+import { db } from "@/lib/db";
+import * as authSchema from "@/lib/auth-schema";
+
+export const auth = betterAuth({
+  database: drizzleAdapter(db, {
+    provider: "pg", // or "pg" or "mysql"
+    usePlural: true,
+    schema: {
+      ...authSchema,
+    },
+  }),
+
+  emailAndPassword: {
+    enabled: true,
+  },
+  baseURL: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3700",
+});
+
+export type Session = typeof auth.$Infer.Session;
+export type UserSession = Session["user"];
