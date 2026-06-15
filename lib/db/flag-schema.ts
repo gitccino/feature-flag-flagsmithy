@@ -15,6 +15,12 @@ import {
 import { users } from "@/lib/auth-schema";
 import type { SegmentRules } from "@/lib/zod-schema";
 
+// request context captured at mutation time (not user-supplied)
+export type AuditLogMetadata = {
+  ip?: string;
+  userAgent?: string;
+};
+
 // cascade — parent delete -> children delete
 // restrict — parent delete blocked if child exists
 
@@ -162,6 +168,34 @@ export const flagTargetingRules = pgTable(
   ],
 );
 
+/**
+ * audit_logs — immutable trail of admin mutations (actor, scope, before/after diff)
+ */
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    actorId: text("actor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }), // keep trail even if user lingers
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }), // drop logs when project gone
+    environmentId: uuid("environment_id"), // nullable, no FK — survives env deletion
+    entityType: text("entity_type").notNull(), // e.g. "flag", "segment", "project"
+    entityId: uuid("entity_id").notNull(),
+    action: text("action").notNull(), // e.g. "create", "update", "delete"
+    before: jsonb("before"), // null on create
+    after: jsonb("after"), // null on delete
+    metadata: jsonb("metadata").$type<AuditLogMetadata>(), // ip / userAgent
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("audit_logs_project_id_idx").on(table.projectId), // query trail by project
+    index("audit_logs_actor_id_idx").on(table.actorId), // query trail by actor
+  ],
+);
+
 // ———
 // Not about DB. Drizzle ORM metadata only. Tells Drizzle how tables connect so relational queries work
 export const projectRelations = relations(projects, ({ one, many }) => ({
@@ -172,6 +206,18 @@ export const projectRelations = relations(projects, ({ one, many }) => ({
   environments: many(environments),
   flags: many(flags),
   segments: many(segments),
+  auditLogs: many(auditLogs),
+}));
+
+export const auditLogRelations = relations(auditLogs, ({ one }) => ({
+  actor: one(users, {
+    fields: [auditLogs.actorId],
+    references: [users.id],
+  }),
+  project: one(projects, {
+    fields: [auditLogs.projectId],
+    references: [projects.id],
+  }),
 }));
 
 export const environmentRelations = relations(
