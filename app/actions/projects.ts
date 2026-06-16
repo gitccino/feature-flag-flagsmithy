@@ -28,14 +28,17 @@ const ENVIRONMENT_SEEDS = [
 
 const MAX_SLUG_ATTEMPTS = 5;
 
-// Postgres unique_violation — slug already taken
+// Postgres unique_violation — slug already taken for this owner
 function isUniqueViolation(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code?: string }).code === "23505"
-  );
+  let current: unknown = err;
+  while (current && typeof current === "object") {
+    if ("code" in current && (current as { code?: string }).code === "23505") {
+      return true;
+    }
+    current =
+      "cause" in current ? (current as { cause?: unknown }).cause : undefined;
+  }
+  return false;
 }
 
 export async function createProject(

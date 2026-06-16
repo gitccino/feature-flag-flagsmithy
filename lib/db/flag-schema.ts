@@ -29,7 +29,7 @@ export const projects = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     name: text("name").notNull(),
-    slug: text("slug").notNull().unique(),
+    slug: text("slug").notNull(),
     createdBy: text("created_by")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }), // can't delete user if they still own projects
@@ -39,7 +39,10 @@ export const projects = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [index("projects_created_by_idx").on(table.createdBy)],
+  (table) => [
+    index("projects_created_by_idx").on(table.createdBy),
+    unique("projects_created_by_slug_unique").on(table.createdBy, table.slug),
+  ],
 );
 
 export const environmentKeyEnum = pgEnum("environment_key", [
