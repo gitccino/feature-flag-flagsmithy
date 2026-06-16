@@ -31,10 +31,7 @@ export default async function AdminLayout({
         <div className="flex flex-1 items-center">
           <div>
             <Button variant="link" asChild>
-              <Link href="/">Dashboard</Link>
-            </Button>
-            <Button variant="link" asChild>
-              <Link href="/segments">Segments</Link>
+              <Link href="/projects">Projects</Link>
             </Button>
           </div>
           <div className="ml-auto">

@@ -1,6 +1,6 @@
-export default function SegmentPage() {
+export default function SegmentsPage() {
   return (
-    <div className="text-muted-foreground p-6">
+    <div className="text-muted-foreground text-sm">
       Reusable audience definitions shared across all environments in this
       project.
     </div>
