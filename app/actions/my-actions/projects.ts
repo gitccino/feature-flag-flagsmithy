@@ -2,8 +2,6 @@ import z from "zod";
 import { CreateProjectInput, createProjectSchema } from "@/lib/zod-schema";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
-import { buildSignInPath } from "@/lib/auth/callback-url";
 import { slugify, slugWithSuffix } from "@/lib/slug";
 import { dbPool } from "@/lib/db";
 import { auditLogs, environments, projects } from "@/lib/db/schema";
