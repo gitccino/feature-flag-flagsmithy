@@ -23,6 +23,16 @@ export const signUpSchema = z.object({
 export type SignInInput = z.infer<typeof signInSchema>;
 export type SignUpInput = z.infer<typeof signUpSchema>;
 
+export const createProjectSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Project name is required.")
+    .max(60, "Project name must not exceed 60 characters."),
+});
+
+export type CreateProjectInput = z.infer<typeof createProjectSchema>;
+
 export const segmentConditionOperatorSchema = z.enum([
   "eq",
   "neq",

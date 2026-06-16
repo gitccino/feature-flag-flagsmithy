@@ -15,6 +15,20 @@
       "when": 1781173925865,
       "tag": "0001_feature_flag_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781454298507,
+      "tag": "0002_awesome_dreadnoughts",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781623407308,
+      "tag": "0003_steady_orphan",
+      "breakpoints": true
     }
   ]
 }

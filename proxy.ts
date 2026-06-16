@@ -18,12 +18,8 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/segments", "/segments/:path*"],
-  // Exclude public paths instead of listing every protected route
-  // matcher: [
-  //   "/((?!sign-in|sign-up|api|_next/static|_next/image|favicon.ico).*)",
-  // ],
+  // Protect all routes except auth, API, and static assets — no per-route list to maintain
+  matcher: [
+    "/((?!sign-in|sign-up|api|_next/static|_next/image|favicon.ico).*)",
+  ],
 };
-
-// Gaps for future routes
-// /settings, /flags, /environments
