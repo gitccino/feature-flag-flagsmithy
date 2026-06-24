@@ -41,7 +41,7 @@ export function EditFlagDialog({
   const {
     control,
     handleSubmit,
-    reset,
+    // reset,
     setError,
     formState: { errors, isSubmitting },
   } = useForm<UpdateFlagInput>({
@@ -129,6 +129,7 @@ export function EditFlagDialog({
                 </Field>
               )}
             />
+            {errors.root && <FieldError errors={[errors.root]} />}
           </FieldGroup>
         </form>
 

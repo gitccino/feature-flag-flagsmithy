@@ -49,7 +49,7 @@ export function EditFlagDialog({
   const {
     control,
     handleSubmit,
-    reset,
+    // reset,
     setError,
     formState: { errors, isSubmitting },
   } = useForm<UpdateFlagInput>({

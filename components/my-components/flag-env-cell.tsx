@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Switch } from "../ui/switch";
 import { setFlagEnvironmentState } from "@/app/actions/flags";
-import { boolean } from "zod/v3";
 import {
   Popover,
   PopoverContent,
@@ -122,7 +121,7 @@ export function FlagEnvCell({ state }: FlagEnvCellProps) {
               max={100}
               step={1}
               value={[draftRollout]}
-              onValueChange={(values) => setDraftRollout(values[0] ?? o)}
+              onValueChange={(values) => setDraftRollout(values[0] ?? 0)}
             />
             <Button
               size="sm"
