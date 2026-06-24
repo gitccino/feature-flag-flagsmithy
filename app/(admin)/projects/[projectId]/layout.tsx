@@ -1,29 +1,30 @@
-import { ProjectNav } from "@/components/projects/project-nav";
-import { requireProjectAccess } from "@/lib/auth/project-access";
+import { Suspense } from "react";
 
-export default async function ProjectLayout({
+import { ProjectShell } from "@/components/projects/project-shell";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function ProjectLayoutSkeleton() {
+  return (
+    <div className="space-y-4 p-6">
+      <div className="space-y-2 border-b pb-3">
+        <Skeleton className="h-7 w-48" />
+        <Skeleton className="h-8 w-72" />
+      </div>
+      <Skeleton className="h-40 w-full" />
+    </div>
+  );
+}
+
+export default function ProjectLayout({
   children,
   params,
 }: {
   children: React.ReactNode;
   params: Promise<{ projectId: string }>;
 }) {
-  const { projectId } = await params;
-  // re-verify session + ownership server-side; redirects or 404s on failure
-  const { project } = await requireProjectAccess(projectId);
-
   return (
-    <div className="p-6">
-      <div className="mb-4 flex flex-col gap-3 border-b pb-3">
-        <div className="flex items-baseline gap-2">
-          <h1 className="text-xl font-semibold">{project.name}</h1>
-          <span className="text-muted-foreground font-mono text-xs">
-            {project.slug}
-          </span>
-        </div>
-        <ProjectNav projectId={projectId} />
-      </div>
-      {children}
-    </div>
+    <Suspense fallback={<ProjectLayoutSkeleton />}>
+      <ProjectShell params={params}>{children}</ProjectShell>
+    </Suspense>
   );
 }

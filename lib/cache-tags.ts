@@ -4,4 +4,5 @@
  */
 export const cacheTags = {
   projects: (userId: string) => `projects:user:${userId}`,
+  flags: (projectId: string) => `flags:project:${projectId}`,
 } as const;
