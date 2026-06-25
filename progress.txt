@@ -5,6 +5,18 @@
 - Table pattern: pgTable with (table) => [ index(...), unique(...) ] array form. Define a relations() export for each new table and add `many()` on the parent relation.
 - Audit logs: entityType/action are free text; environmentId is nullable with no FK (survives env deletion).
 
+## 2026-06-25 - US-005
+- bun add @upstash/redis @upstash/ratelimit. lib/redis.ts: single Upstash client via makeClient() — returns null when UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN missing so callers fall back to Postgres (no throw, no 500). getEnvConfig/setEnvConfig/delEnvConfig keyed `flags:env:<envId>`, EX 300; all three try/catch + degrade to no-cache on Redis error.
+- Route (app/api/v1/flags/route.ts): getEnvConfig first; miss/outage -> Postgres innerJoin -> setEnvConfig. EnvFlagState type matches FlagStateRow.
+- Invalidation in app/actions/flags.ts: setFlagEnvironmentState DELs existing.environmentId; createFlag DELs all project env ids (captured from tx projectEnvironments, returned in data); deleteFlag loads envs via db.query.environments.findMany then DELs all; updateFlag does NOT bust (no eval-relevant change).
+- Files: lib/redis.ts, app/api/v1/flags/route.ts, app/actions/flags.ts, package.json, bun.lock, prd.json.
+- Typecheck + lint pass. No Redis running locally so cache path exercised only via null-client fallback; live cache needs UPSTASH env vars set.
+- **Learnings for future iterations:**
+  - lib/redis.ts client is null without env vars — anything importing it (US-006 ratelimit) must handle null = fail-open.
+  - Upstash redis.set/get auto-JSON-serialize objects; redis.get<T>() returns typed value or null.
+  - US-006: build Ratelimit sharing the same `redis` client; key on keyHash. If redis null, skip limiting (fail open).
+---
+
 ## 2026-06-25 - US-004
 - app/api/v1/flags/route.ts POST: parseBearer(authorization) -> hashApiKey -> db lookup apiKeys by keyHash. No token / unknown / revokedAt set -> 401 {error:"invalid api key"} (generic, shared const). Body optional: empty body ok, malformed JSON or bad shape -> 400 {error:"invalid body"}. innerJoin flagEnvironmentStates -> flags on flagId for flag.key, filter by key.environmentId. Returns 200 { flags: { "<key>": { enabled } } }; empty env -> {flags:{}}.
 - Exported pure buildFlagMap(states, identity?) for unit testing (handler DB path can't run without a live DB).

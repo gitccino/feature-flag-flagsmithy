@@ -75,8 +75,8 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "lib/redis.ts: makeClient() returns null when UPSTASH env vars absent (graceful fallback, no throw). getEnvConfig/setEnvConfig/delEnvConfig keyed flags:env:<envId> EX 300, all swallow Redis errors. Route reads cache first, miss populates from Postgres. flags.ts: setFlagEnvironmentState DELs existing.environmentId; createFlag/deleteFlag DEL all project env ids (deleteFlag loads envs via db.query.environments.findMany); updateFlag no bust."
     },
     {
       "id": "US-006",

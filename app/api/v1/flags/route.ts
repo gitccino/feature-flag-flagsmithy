@@ -6,6 +6,7 @@ import { hashApiKey, parseBearer } from "@/lib/api-keys";
 import { db } from "@/lib/db";
 import { apiKeys, flagEnvironmentStates, flags } from "@/lib/db/schema";
 import { resolveEnabled } from "@/lib/evaluation/bucketing";
+import { getEnvConfig, setEnvConfig } from "@/lib/redis";
 
 const bodySchema = z.object({ identity: z.string().optional() });
 
@@ -59,15 +60,20 @@ export async function POST(request: Request) {
   }
   const identity = parsed.data.identity;
 
-  const states = await db
-    .select({
-      key: flags.key,
-      enabled: flagEnvironmentStates.enabled,
-      rolloutPercentage: flagEnvironmentStates.rolloutPercentage,
-    })
-    .from(flagEnvironmentStates)
-    .innerJoin(flags, eq(flagEnvironmentStates.flagId, flags.id))
-    .where(eq(flagEnvironmentStates.environmentId, key.environmentId));
+  // Cache hot path: Redis first, miss/outage falls back to Postgres.
+  let states = await getEnvConfig(key.environmentId);
+  if (!states) {
+    states = await db
+      .select({
+        key: flags.key,
+        enabled: flagEnvironmentStates.enabled,
+        rolloutPercentage: flagEnvironmentStates.rolloutPercentage,
+      })
+      .from(flagEnvironmentStates)
+      .innerJoin(flags, eq(flagEnvironmentStates.flagId, flags.id))
+      .where(eq(flagEnvironmentStates.environmentId, key.environmentId));
+    await setEnvConfig(key.environmentId, states);
+  }
 
   return NextResponse.json({ flags: buildFlagMap(states, identity) });
 }
