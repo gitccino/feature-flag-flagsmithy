@@ -11,7 +11,7 @@
  */
 import { generateApiKey } from "@/lib/api-keys";
 import { db } from "@/lib/db";
-import { apiKeys, environments } from "@/lib/db/schema";
+import { apiKeys } from "@/lib/db/schema";
 
 const wantKey = process.argv[2]; // optional env key filter, e.g. "production"
 
