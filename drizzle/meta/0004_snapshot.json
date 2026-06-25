@@ -1,5 +1,5 @@
 {
-  "id": "9b24ddf5-19c7-4fd7-ba2a-f8329d32af74",
+  "id": "1d317aae-dc16-48cd-8508-be205ecb085f",
   "prevId": "8b8f2c3f-99f1-4f7f-80f4-c92e4a12933b",
   "version": "7",
   "dialect": "postgresql",
@@ -393,12 +393,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "last_used_at": {
-          "name": "last_used_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
         },
         "created_at": {
           "name": "created_at",

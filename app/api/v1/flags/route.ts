@@ -1,17 +1,19 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 
 import { hashApiKey, parseBearer } from "@/lib/api-keys";
 import { db } from "@/lib/db";
 import { apiKeys, flagEnvironmentStates, flags } from "@/lib/db/schema";
 import { resolveEnabled } from "@/lib/evaluation/bucketing";
-import { checkRateLimit } from "@/lib/ratelimit";
+import { checkIpRateLimit, checkRateLimit } from "@/lib/ratelimit";
 import { getEnvConfig, setEnvConfig } from "@/lib/redis";
+import { evaluateFlagsSchema } from "@/lib/zod-schema";
 
-const bodySchema = z.object({ identity: z.string().optional() });
-
-type FlagStateRow = { key: string; enabled: boolean; rolloutPercentage: number };
+type FlagStateRow = {
+  key: string;
+  enabled: boolean;
+  rolloutPercentage: number;
+};
 
 // Shape DB rows into the map-keyed response { "<key>": { enabled } }.
 // Exported for unit testing (the rest of the handler needs a live DB).
@@ -31,7 +33,22 @@ const INVALID_KEY = NextResponse.json(
   { status: 401 },
 );
 
+function tooManyRequests(retryAfter: number) {
+  return NextResponse.json(
+    { error: "rate limit exceeded" },
+    { status: 429, headers: { "Retry-After": String(retryAfter) } },
+  );
+}
+
 export async function POST(request: Request) {
+  // Per-IP guard runs before auth so spammed bad keys can't hammer the DB lookup.
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown";
+  const ipRate = await checkIpRateLimit(ip);
+  if (!ipRate.allowed) return tooManyRequests(ipRate.retryAfter);
+
   const token = parseBearer(request.headers.get("authorization"));
   if (!token) return INVALID_KEY;
 
@@ -50,12 +67,7 @@ export async function POST(request: Request) {
   if (!key || key.revokedAt) return INVALID_KEY;
 
   const rate = await checkRateLimit(keyHash);
-  if (!rate.allowed) {
-    return NextResponse.json(
-      { error: "rate limit exceeded" },
-      { status: 429, headers: { "Retry-After": String(rate.retryAfter) } },
-    );
-  }
+  if (!rate.allowed) return tooManyRequests(rate.retryAfter);
 
   // Body is optional; tolerate an empty/no body but reject malformed JSON shapes.
   let raw: unknown = {};
@@ -65,7 +77,7 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
-  const parsed = bodySchema.safeParse(raw);
+  const parsed = evaluateFlagsSchema.safeParse(raw);
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }

@@ -134,3 +134,8 @@ export const createApiKeySchema = z.object({
 });
 
 export type CreateApiKeyInput = z.infer<typeof createApiKeySchema>;
+
+export const evaluateFlagsSchema = z.object({
+  identity: z.string().min(1).max(200).optional(),
+});
+export type EvaluateFlagsInput = z.infer<typeof evaluateFlagsSchema>;

@@ -13,6 +13,18 @@ const limiter = redis
     })
   : null;
 
+// Per-IP guard for *unauthenticated* traffic: throttles bad/unknown keys before
+// they reach the api_keys DB lookup, capping the cheap-per-request DoS vector.
+// Wider window than the per-key limit since legit clients behind one NAT share an IP.
+// ponytail: app-layer IP limit; move to edge/WAF rate-limiting at the deploy host later.
+const ipLimiter = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(300, "10 s"),
+      prefix: "ratelimit:eval:ip",
+    })
+  : null;
+
 export type RateLimitResult = {
   allowed: boolean;
   // Seconds until the window resets; 0 when allowed or unknown.
@@ -21,7 +33,9 @@ export type RateLimitResult = {
 
 // Enforce the per-key limit. Fail open on any infra error so a Redis outage
 // never blocks evaluation; a genuine over-limit is still enforced.
-export async function checkRateLimit(keyHash: string): Promise<RateLimitResult> {
+export async function checkRateLimit(
+  keyHash: string,
+): Promise<RateLimitResult> {
   if (!limiter) return { allowed: true, retryAfter: 0 };
   try {
     const { success, reset } = await limiter.limit(keyHash);
@@ -30,6 +44,21 @@ export async function checkRateLimit(keyHash: string): Promise<RateLimitResult> 
     return { allowed: false, retryAfter };
   } catch (err) {
     console.error("checkRateLimit failed, failing open", err);
+    return { allowed: true, retryAfter: 0 };
+  }
+}
+
+// Per-IP limit, applied before auth so invalid keys can't spam the DB lookup.
+// Same fail-open contract as checkRateLimit.
+export async function checkIpRateLimit(ip: string): Promise<RateLimitResult> {
+  if (!ipLimiter) return { allowed: true, retryAfter: 0 };
+  try {
+    const { success, reset } = await ipLimiter.limit(ip);
+    if (success) return { allowed: true, retryAfter: 0 };
+    const retryAfter = Math.max(0, Math.ceil((reset - Date.now()) / 1000));
+    return { allowed: false, retryAfter };
+  } catch (err) {
+    console.error("checkIpRateLimit failed, failing open", err);
     return { allowed: true, retryAfter: 0 };
   }
 }

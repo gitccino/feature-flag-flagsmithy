@@ -4,7 +4,6 @@ CREATE TABLE "api_keys" (
 	"name" text NOT NULL,
 	"key_prefix" text NOT NULL,
 	"key_hash" text NOT NULL,
-	"last_used_at" timestamp,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"revoked_at" timestamp,
 	CONSTRAINT "api_keys_key_hash_unique" UNIQUE("key_hash")

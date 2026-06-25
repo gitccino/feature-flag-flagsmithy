@@ -185,7 +185,6 @@ export const apiKeys = pgTable(
     name: text("name").notNull(),
     keyPrefix: text("key_prefix").notNull(), // non-secret display prefix
     keyHash: text("key_hash").notNull(), // sha256 of plaintext
-    lastUsedAt: timestamp("last_used_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     revokedAt: timestamp("revoked_at"),
   },
