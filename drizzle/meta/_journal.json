@@ -29,6 +29,13 @@
       "when": 1781623407308,
       "tag": "0003_steady_orphan",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782358776002,
+      "tag": "0004_loud_ghost_rider",
+      "breakpoints": true
     }
   ]
 }

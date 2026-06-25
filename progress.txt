@@ -1,0 +1,16 @@
+## Codebase Patterns
+- DB schema lives in lib/db/flag-schema.ts; lib/db/schema.ts re-exports it (auth + flag). drizzle.config.ts points schema at lib/db/schema.ts.
+- Migration workflow: `bunx drizzle-kit generate` (creates drizzle/NNNN_*.sql) then `bunx drizzle-kit migrate` to apply. DB is remote Neon via .env.local DATABASE_URL.
+- Typecheck: `bunx tsc --noEmit` (no dedicated script). Lint: `bun run lint` (bare eslint).
+- Table pattern: pgTable with (table) => [ index(...), unique(...) ] array form. Define a relations() export for each new table and add `many()` on the parent relation.
+- Audit logs: entityType/action are free text; environmentId is nullable with no FK (survives env deletion).
+
+## 2026-06-25 - US-001
+- Added api_keys table to lib/db/flag-schema.ts: id, environmentId (FK -> environments, cascade), name, keyPrefix, keyHash, lastUsedAt (nullable), createdAt, revokedAt (nullable). Unique index on keyHash, index on environmentId. Added apiKeyRelations + apiKeys to environmentRelations.
+- Generated drizzle/0004_loud_ghost_rider.sql and applied via drizzle-kit migrate (succeeded).
+- Files changed: lib/db/flag-schema.ts, drizzle/0004_loud_ghost_rider.sql, drizzle/meta/*, prd.json.
+- Typecheck + lint pass.
+- **Learnings for future iterations:**
+  - US-002 needs lib/api-keys.ts (generateApiKey/hashApiKey/parseBearer) + a createApiKey server action using requireProjectAccess (find existing auth helper) and the audit-log writer used by other actions.
+  - keyHash is the unique lookup column for the eval endpoint (US-004); plaintext never stored.
+---
