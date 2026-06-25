@@ -123,3 +123,14 @@ export const segmentRulesSchema = z.object({
 });
 
 export type SegmentRules = z.infer<typeof segmentRulesSchema>;
+
+export const createApiKeySchema = z.object({
+  environmentId: z.uuid(),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Key name is required.")
+    .max(60, "Key name must not exceed 60 characters."),
+});
+
+export type CreateApiKeyInput = z.infer<typeof createApiKeySchema>;

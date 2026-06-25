@@ -14,3 +14,16 @@
   - US-002 needs lib/api-keys.ts (generateApiKey/hashApiKey/parseBearer) + a createApiKey server action using requireProjectAccess (find existing auth helper) and the audit-log writer used by other actions.
   - keyHash is the unique lookup column for the eval endpoint (US-004); plaintext never stored.
 ---
+
+## 2026-06-25 - US-002
+- lib/api-keys.ts: generateApiKey(envKey) -> {plaintext: fsk_<env>_<base64url(32)>, keyPrefix, keyHash(sha256 hex)}, hashApiKey, parseBearer (case-insensitive Bearer scheme).
+- app/actions/api-keys.ts: createApiKey server action. Zod-validates {environmentId, name}, resolves session, resolves project via environment.projectId, re-checks createdBy ownership, inserts apiKeys (keyPrefix+keyHash only), writes audit log (entityType:"api_key", action:"create", environmentId set, after:{name,keyPrefix} no secret). Returns plaintext once.
+- lib/zod-schema.ts: createApiKeySchema + CreateApiKeyInput.
+- scripts/api-keys.test.ts: generate->hash->parse round-trip + parseBearer edge cases. Run: bunx tsx scripts/api-keys.test.ts.
+- Files: lib/api-keys.ts, app/actions/api-keys.ts, lib/zod-schema.ts, scripts/api-keys.test.ts, prd.json.
+- Typecheck + lint + test pass.
+- **Learnings for future iterations:**
+  - requireProjectAccess (lib/auth/project-access.ts) calls redirect/notFound — DON'T use in result-returning server actions. Use the flags.ts pattern: resolveActor() + manual ownership check (project.createdBy === session.user.id).
+  - createApiKey takes environmentId (not projectId); resolve project through environment.projectId.
+  - tsx resolves the @/* path alias, so scripts/*.test.ts can import @/lib/*. Use bunx tsx <file> for unit tests (no test framework installed).
+  - US-004 eval endpoint: lookup apiKeys by hashApiKey(parseBearer(authHeader)); keyHash is unique index; environment.key enum is development|staging|production.

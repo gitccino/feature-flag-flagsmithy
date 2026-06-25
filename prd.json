@@ -30,8 +30,8 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "createApiKey resolves project via environment then checks ownership (requireProjectAccess redirects/notFounds, unfit for result-returning actions) — matches flags.ts pattern."
     },
     {
       "id": "US-003",
