@@ -60,8 +60,8 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "POST /api/v1/flags. parseBearer->hashApiKey->lookup; missing/unknown/revoked -> 401 generic. Body optional (empty allowed), malformed JSON or bad shape -> 400. innerJoin flagEnvironmentStates->flags for key. Pure buildFlagMap(states, identity?) exported for unit test."
     },
     {
       "id": "US-005",

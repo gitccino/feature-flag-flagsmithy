@@ -5,6 +5,18 @@
 - Table pattern: pgTable with (table) => [ index(...), unique(...) ] array form. Define a relations() export for each new table and add `many()` on the parent relation.
 - Audit logs: entityType/action are free text; environmentId is nullable with no FK (survives env deletion).
 
+## 2026-06-25 - US-004
+- app/api/v1/flags/route.ts POST: parseBearer(authorization) -> hashApiKey -> db lookup apiKeys by keyHash. No token / unknown / revokedAt set -> 401 {error:"invalid api key"} (generic, shared const). Body optional: empty body ok, malformed JSON or bad shape -> 400 {error:"invalid body"}. innerJoin flagEnvironmentStates -> flags on flagId for flag.key, filter by key.environmentId. Returns 200 { flags: { "<key>": { enabled } } }; empty env -> {flags:{}}.
+- Exported pure buildFlagMap(states, identity?) for unit testing (handler DB path can't run without a live DB).
+- scripts/eval-endpoint.test.ts: auth reject (no header, non-Bearer), anonymous all-or-nothing, deterministic per-identity, empty env. Run: DATABASE_URL='postgresql://u:p@localhost/db' bunx tsx scripts/eval-endpoint.test.ts (dummy URL only constructs lib/db at import; no connection).
+- Files: app/api/v1/flags/route.ts, scripts/eval-endpoint.test.ts, prd.json.
+- Typecheck + lint + test pass.
+- **Learnings for future iterations:**
+  - Route handlers: import db from @/lib/db; NextResponse.json for responses. lib/db/index.ts constructs drizzle at module load, so importing any handler in a tsx test needs DATABASE_URL set (dummy is fine).
+  - US-005 caches per env: route currently reads Postgres directly in POST — wrap that read (the innerJoin block) behind getEnvConfig/setEnvConfig keyed flags:env:<environmentId>. key.environmentId is the cache key.
+  - US-006 rate limit key = keyHash (= hashApiKey(token)); already computed in the handler.
+---
+
 ## 2026-06-25 - US-001
 - Added api_keys table to lib/db/flag-schema.ts: id, environmentId (FK -> environments, cascade), name, keyPrefix, keyHash, lastUsedAt (nullable), createdAt, revokedAt (nullable). Unique index on keyHash, index on environmentId. Added apiKeyRelations + apiKeys to environmentRelations.
 - Generated drizzle/0004_loud_ghost_rider.sql and applied via drizzle-kit migrate (succeeded).
