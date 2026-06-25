@@ -5,6 +5,17 @@
 - Table pattern: pgTable with (table) => [ index(...), unique(...) ] array form. Define a relations() export for each new table and add `many()` on the parent relation.
 - Audit logs: entityType/action are free text; environmentId is nullable with no FK (survives env deletion).
 
+## 2026-06-25 - US-006
+- lib/ratelimit.ts: Ratelimit.slidingWindow(100, "10 s") sharing the lib/redis.ts `redis` client, prefix "ratelimit:eval". limiter is null when redis is null (no UPSTASH env), so checkRateLimit returns {allowed:true,retryAfter:0} — fails open. limit() throw -> fail open + console.error.
+- Route (app/api/v1/flags/route.ts): compute keyHash once, reuse for both the apiKeys lookup and checkRateLimit (called right after key validation). Over-limit -> 429 {error:"rate limit exceeded"} + Retry-After header = ceil((reset-Date.now())/1000) seconds.
+- scripts/ratelimit.test.ts: asserts fail-open when redis null. Run: bunx tsx scripts/ratelimit.test.ts.
+- Files: lib/ratelimit.ts, app/api/v1/flags/route.ts, scripts/ratelimit.test.ts, prd.json.
+- Typecheck + lint + test pass. Live limiting needs UPSTASH env vars; only fail-open path exercised locally.
+- **Learnings for future iterations:**
+  - All stories US-001..US-006 now pass. Evaluation API complete.
+  - @upstash/ratelimit reset is an epoch-ms timestamp; Retry-After wants whole seconds.
+---
+
 ## 2026-06-25 - US-005
 - bun add @upstash/redis @upstash/ratelimit. lib/redis.ts: single Upstash client via makeClient() — returns null when UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN missing so callers fall back to Postgres (no throw, no 500). getEnvConfig/setEnvConfig/delEnvConfig keyed `flags:env:<envId>`, EX 300; all three try/catch + degrade to no-cache on Redis error.
 - Route (app/api/v1/flags/route.ts): getEnvConfig first; miss/outage -> Postgres innerJoin -> setEnvConfig. EnvFlagState type matches FlagStateRow.

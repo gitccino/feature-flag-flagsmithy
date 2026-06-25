@@ -6,6 +6,7 @@ import { hashApiKey, parseBearer } from "@/lib/api-keys";
 import { db } from "@/lib/db";
 import { apiKeys, flagEnvironmentStates, flags } from "@/lib/db/schema";
 import { resolveEnabled } from "@/lib/evaluation/bucketing";
+import { checkRateLimit } from "@/lib/ratelimit";
 import { getEnvConfig, setEnvConfig } from "@/lib/redis";
 
 const bodySchema = z.object({ identity: z.string().optional() });
@@ -34,6 +35,8 @@ export async function POST(request: Request) {
   const token = parseBearer(request.headers.get("authorization"));
   if (!token) return INVALID_KEY;
 
+  const keyHash = hashApiKey(token);
+
   const [key] = await db
     .select({
       id: apiKeys.id,
@@ -41,10 +44,18 @@ export async function POST(request: Request) {
       revokedAt: apiKeys.revokedAt,
     })
     .from(apiKeys)
-    .where(eq(apiKeys.keyHash, hashApiKey(token)))
+    .where(eq(apiKeys.keyHash, keyHash))
     .limit(1);
 
   if (!key || key.revokedAt) return INVALID_KEY;
+
+  const rate = await checkRateLimit(keyHash);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "rate limit exceeded" },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfter) } },
+    );
+  }
 
   // Body is optional; tolerate an empty/no body but reject malformed JSON shapes.
   let raw: unknown = {};

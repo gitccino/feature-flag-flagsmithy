@@ -89,8 +89,8 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "lib/ratelimit.ts: Ratelimit.slidingWindow(100,'10 s') sharing lib/redis.ts client, prefix ratelimit:eval. limiter null when redis null -> checkRateLimit fails open. Route checks after key lookup using already-computed keyHash; over-limit -> 429 + Retry-After (seconds = ceil((reset-now)/1000)). limit() throw -> fail open + log."
     }
   ]
 }
