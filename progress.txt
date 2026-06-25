@@ -27,3 +27,13 @@
   - createApiKey takes environmentId (not projectId); resolve project through environment.projectId.
   - tsx resolves the @/* path alias, so scripts/*.test.ts can import @/lib/*. Use bunx tsx <file> for unit tests (no test framework installed).
   - US-004 eval endpoint: lookup apiKeys by hashApiKey(parseBearer(authHeader)); keyHash is unique index; environment.key enum is development|staging|production.
+---
+
+## 2026-06-25 - US-003
+- lib/evaluation/bucketing.ts: inline FNV-1a 32-bit (Math.imul for overflow), bucketFor(flagKey, identity) = fnv1a(`${flagKey}:${identity}`) % 10000, resolveEnabled(state, identity?).
+- resolveEnabled signature takes state {key,enabled,rolloutPercentage} (key embedded in state, NOT a separate arg) so US-004 maps over flag-state rows directly. Identity -> enabled && bucket < rolloutPercentage*100. No identity/empty -> enabled && rolloutPercentage===100 (all-or-nothing).
+- scripts/bucketing.test.ts: distribution within +/-2% at 50% (50k samples), monotonic, determinism, disabled-off, anonymous all-or-nothing. Run: bunx tsx scripts/bucketing.test.ts.
+- Files: lib/evaluation/bucketing.ts, scripts/bucketing.test.ts, prd.json.
+- Typecheck + lint + test pass.
+- **Learnings for future iterations:**
+  - US-004 builds map { "<key>": { enabled: resolveEnabled(state, identity) } }. flagEnvironmentStates has enabled+rolloutPercentage; need flag.key from flags table (join flagEnvironmentStates.flagId -> flags). rolloutPercentage is integer 0-100, NOT exposed in response.

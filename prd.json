@@ -44,8 +44,8 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "resolveEnabled(state, identity?) takes state with {key,enabled,rolloutPercentage} — key lives in state so US-004 can map over flag states directly. FNV-1a via Math.imul for 32-bit overflow."
     },
     {
       "id": "US-004",
