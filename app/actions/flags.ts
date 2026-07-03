@@ -15,6 +15,7 @@ import {
   flags,
   projects,
 } from "@/lib/db/schema";
+import { delEnvConfig } from "@/lib/redis";
 import {
   createFlagSchema,
   deleteFlagSchema,
@@ -127,11 +128,17 @@ export async function createFlag(
         metadata: { ip: actor.ip, userAgent: actor.userAgent },
       });
 
-      return { id: flag.id, key: flag.key };
+      return {
+        id: flag.id,
+        key: flag.key,
+        envIds: projectEnvironments.map((env) => env.id),
+      };
     });
 
     updateTag(cacheTags.flags(projectId));
-    return { ok: true, data };
+    // New flag adds a state row to every env — bust all of them.
+    await Promise.all(data.envIds.map(delEnvConfig));
+    return { ok: true, data: { id: data.id, key: data.key } };
   } catch (err) {
     if (isUniqueViolation(err)) {
       return {
@@ -236,6 +243,10 @@ export async function deleteFlag(
     return { ok: false, error: "Project not found." };
   }
 
+  const projectEnvironments = await db.query.environments.findMany({
+    where: eq(environments.projectId, existing.projectId),
+  });
+
   await dbPool.transaction(async (tx) => {
     await tx.delete(flags).where(eq(flags.id, flagId));
 
@@ -255,6 +266,8 @@ export async function deleteFlag(
   });
 
   updateTag(cacheTags.flags(existing.projectId));
+  // Deleting a flag removes its state from every env — bust all of them.
+  await Promise.all(projectEnvironments.map((env) => delEnvConfig(env.id)));
   return { ok: true, data: { id: flagId } };
 }
 
@@ -320,5 +333,6 @@ export async function setFlagEnvironmentState(
   });
 
   updateTag(cacheTags.flags(existing.flag.projectId));
+  await delEnvConfig(existing.environmentId);
   return { ok: true, data };
 }

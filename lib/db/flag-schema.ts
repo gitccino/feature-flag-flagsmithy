@@ -172,6 +172,29 @@ export const flagTargetingRules = pgTable(
 );
 
 /**
+ * api_keys — per-environment keys authenticating public evaluation requests.
+ * Only keyPrefix + keyHash are stored; the plaintext is shown once at creation.
+ */
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    environmentId: uuid("environment_id")
+      .notNull()
+      .references(() => environments.id, { onDelete: "cascade" }), // drop keys when env gone
+    name: text("name").notNull(),
+    keyPrefix: text("key_prefix").notNull(), // non-secret display prefix
+    keyHash: text("key_hash").notNull(), // sha256 of plaintext
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    revokedAt: timestamp("revoked_at"),
+  },
+  (table) => [
+    unique("api_keys_key_hash_unique").on(table.keyHash), // lookup + dedupe by hash
+    index("api_keys_environment_id_idx").on(table.environmentId),
+  ],
+);
+
+/**
  * audit_logs — immutable trail of admin mutations (actor, scope, before/after diff)
  */
 export const auditLogs = pgTable(
@@ -231,8 +254,16 @@ export const environmentRelations = relations(
       references: [projects.id],
     }),
     flagEnvironmentStates: many(flagEnvironmentStates),
+    apiKeys: many(apiKeys),
   }),
 );
+
+export const apiKeyRelations = relations(apiKeys, ({ one }) => ({
+  environment: one(environments, {
+    fields: [apiKeys.environmentId],
+    references: [environments.id],
+  }),
+}));
 
 export const flagRelations = relations(flags, ({ one, many }) => ({
   project: one(projects, {

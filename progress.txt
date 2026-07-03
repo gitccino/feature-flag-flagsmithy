@@ -1,0 +1,74 @@
+## Codebase Patterns
+- DB schema lives in lib/db/flag-schema.ts; lib/db/schema.ts re-exports it (auth + flag). drizzle.config.ts points schema at lib/db/schema.ts.
+- Migration workflow: `bunx drizzle-kit generate` (creates drizzle/NNNN_*.sql) then `bunx drizzle-kit migrate` to apply. DB is remote Neon via .env.local DATABASE_URL.
+- Typecheck: `bunx tsc --noEmit` (no dedicated script). Lint: `bun run lint` (bare eslint).
+- Table pattern: pgTable with (table) => [ index(...), unique(...) ] array form. Define a relations() export for each new table and add `many()` on the parent relation.
+- Audit logs: entityType/action are free text; environmentId is nullable with no FK (survives env deletion).
+
+## 2026-06-25 - US-006
+- lib/ratelimit.ts: Ratelimit.slidingWindow(100, "10 s") sharing the lib/redis.ts `redis` client, prefix "ratelimit:eval". limiter is null when redis is null (no UPSTASH env), so checkRateLimit returns {allowed:true,retryAfter:0} — fails open. limit() throw -> fail open + console.error.
+- Route (app/api/v1/flags/route.ts): compute keyHash once, reuse for both the apiKeys lookup and checkRateLimit (called right after key validation). Over-limit -> 429 {error:"rate limit exceeded"} + Retry-After header = ceil((reset-Date.now())/1000) seconds.
+- scripts/ratelimit.test.ts: asserts fail-open when redis null. Run: bunx tsx scripts/ratelimit.test.ts.
+- Files: lib/ratelimit.ts, app/api/v1/flags/route.ts, scripts/ratelimit.test.ts, prd.json.
+- Typecheck + lint + test pass. Live limiting needs UPSTASH env vars; only fail-open path exercised locally.
+- **Learnings for future iterations:**
+  - All stories US-001..US-006 now pass. Evaluation API complete.
+  - @upstash/ratelimit reset is an epoch-ms timestamp; Retry-After wants whole seconds.
+---
+
+## 2026-06-25 - US-005
+- bun add @upstash/redis @upstash/ratelimit. lib/redis.ts: single Upstash client via makeClient() — returns null when UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN missing so callers fall back to Postgres (no throw, no 500). getEnvConfig/setEnvConfig/delEnvConfig keyed `flags:env:<envId>`, EX 300; all three try/catch + degrade to no-cache on Redis error.
+- Route (app/api/v1/flags/route.ts): getEnvConfig first; miss/outage -> Postgres innerJoin -> setEnvConfig. EnvFlagState type matches FlagStateRow.
+- Invalidation in app/actions/flags.ts: setFlagEnvironmentState DELs existing.environmentId; createFlag DELs all project env ids (captured from tx projectEnvironments, returned in data); deleteFlag loads envs via db.query.environments.findMany then DELs all; updateFlag does NOT bust (no eval-relevant change).
+- Files: lib/redis.ts, app/api/v1/flags/route.ts, app/actions/flags.ts, package.json, bun.lock, prd.json.
+- Typecheck + lint pass. No Redis running locally so cache path exercised only via null-client fallback; live cache needs UPSTASH env vars set.
+- **Learnings for future iterations:**
+  - lib/redis.ts client is null without env vars — anything importing it (US-006 ratelimit) must handle null = fail-open.
+  - Upstash redis.set/get auto-JSON-serialize objects; redis.get<T>() returns typed value or null.
+  - US-006: build Ratelimit sharing the same `redis` client; key on keyHash. If redis null, skip limiting (fail open).
+---
+
+## 2026-06-25 - US-004
+- app/api/v1/flags/route.ts POST: parseBearer(authorization) -> hashApiKey -> db lookup apiKeys by keyHash. No token / unknown / revokedAt set -> 401 {error:"invalid api key"} (generic, shared const). Body optional: empty body ok, malformed JSON or bad shape -> 400 {error:"invalid body"}. innerJoin flagEnvironmentStates -> flags on flagId for flag.key, filter by key.environmentId. Returns 200 { flags: { "<key>": { enabled } } }; empty env -> {flags:{}}.
+- Exported pure buildFlagMap(states, identity?) for unit testing (handler DB path can't run without a live DB).
+- scripts/eval-endpoint.test.ts: auth reject (no header, non-Bearer), anonymous all-or-nothing, deterministic per-identity, empty env. Run: DATABASE_URL='postgresql://u:p@localhost/db' bunx tsx scripts/eval-endpoint.test.ts (dummy URL only constructs lib/db at import; no connection).
+- Files: app/api/v1/flags/route.ts, scripts/eval-endpoint.test.ts, prd.json.
+- Typecheck + lint + test pass.
+- **Learnings for future iterations:**
+  - Route handlers: import db from @/lib/db; NextResponse.json for responses. lib/db/index.ts constructs drizzle at module load, so importing any handler in a tsx test needs DATABASE_URL set (dummy is fine).
+  - US-005 caches per env: route currently reads Postgres directly in POST — wrap that read (the innerJoin block) behind getEnvConfig/setEnvConfig keyed flags:env:<environmentId>. key.environmentId is the cache key.
+  - US-006 rate limit key = keyHash (= hashApiKey(token)); already computed in the handler.
+---
+
+## 2026-06-25 - US-001
+- Added api_keys table to lib/db/flag-schema.ts: id, environmentId (FK -> environments, cascade), name, keyPrefix, keyHash, lastUsedAt (nullable), createdAt, revokedAt (nullable). Unique index on keyHash, index on environmentId. Added apiKeyRelations + apiKeys to environmentRelations.
+- Generated drizzle/0004_loud_ghost_rider.sql and applied via drizzle-kit migrate (succeeded).
+- Files changed: lib/db/flag-schema.ts, drizzle/0004_loud_ghost_rider.sql, drizzle/meta/*, prd.json.
+- Typecheck + lint pass.
+- **Learnings for future iterations:**
+  - US-002 needs lib/api-keys.ts (generateApiKey/hashApiKey/parseBearer) + a createApiKey server action using requireProjectAccess (find existing auth helper) and the audit-log writer used by other actions.
+  - keyHash is the unique lookup column for the eval endpoint (US-004); plaintext never stored.
+---
+
+## 2026-06-25 - US-002
+- lib/api-keys.ts: generateApiKey(envKey) -> {plaintext: fsk_<env>_<base64url(32)>, keyPrefix, keyHash(sha256 hex)}, hashApiKey, parseBearer (case-insensitive Bearer scheme).
+- app/actions/api-keys.ts: createApiKey server action. Zod-validates {environmentId, name}, resolves session, resolves project via environment.projectId, re-checks createdBy ownership, inserts apiKeys (keyPrefix+keyHash only), writes audit log (entityType:"api_key", action:"create", environmentId set, after:{name,keyPrefix} no secret). Returns plaintext once.
+- lib/zod-schema.ts: createApiKeySchema + CreateApiKeyInput.
+- scripts/api-keys.test.ts: generate->hash->parse round-trip + parseBearer edge cases. Run: bunx tsx scripts/api-keys.test.ts.
+- Files: lib/api-keys.ts, app/actions/api-keys.ts, lib/zod-schema.ts, scripts/api-keys.test.ts, prd.json.
+- Typecheck + lint + test pass.
+- **Learnings for future iterations:**
+  - requireProjectAccess (lib/auth/project-access.ts) calls redirect/notFound — DON'T use in result-returning server actions. Use the flags.ts pattern: resolveActor() + manual ownership check (project.createdBy === session.user.id).
+  - createApiKey takes environmentId (not projectId); resolve project through environment.projectId.
+  - tsx resolves the @/* path alias, so scripts/*.test.ts can import @/lib/*. Use bunx tsx <file> for unit tests (no test framework installed).
+  - US-004 eval endpoint: lookup apiKeys by hashApiKey(parseBearer(authHeader)); keyHash is unique index; environment.key enum is development|staging|production.
+---
+
+## 2026-06-25 - US-003
+- lib/evaluation/bucketing.ts: inline FNV-1a 32-bit (Math.imul for overflow), bucketFor(flagKey, identity) = fnv1a(`${flagKey}:${identity}`) % 10000, resolveEnabled(state, identity?).
+- resolveEnabled signature takes state {key,enabled,rolloutPercentage} (key embedded in state, NOT a separate arg) so US-004 maps over flag-state rows directly. Identity -> enabled && bucket < rolloutPercentage*100. No identity/empty -> enabled && rolloutPercentage===100 (all-or-nothing).
+- scripts/bucketing.test.ts: distribution within +/-2% at 50% (50k samples), monotonic, determinism, disabled-off, anonymous all-or-nothing. Run: bunx tsx scripts/bucketing.test.ts.
+- Files: lib/evaluation/bucketing.ts, scripts/bucketing.test.ts, prd.json.
+- Typecheck + lint + test pass.
+- **Learnings for future iterations:**
+  - US-004 builds map { "<key>": { enabled: resolveEnabled(state, identity) } }. flagEnvironmentStates has enabled+rolloutPercentage; need flag.key from flags table (join flagEnvironmentStates.flagId -> flags). rolloutPercentage is integer 0-100, NOT exposed in response.
