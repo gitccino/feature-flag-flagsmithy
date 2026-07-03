@@ -50,6 +50,7 @@ export async function POST(request: Request) {
   if (!ipRate.allowed) return tooManyRequests(ipRate.retryAfter);
 
   const token = parseBearer(request.headers.get("authorization"));
+  // Reject requests that do not include a bearer token.
   if (!token) return INVALID_KEY;
 
   const keyHash = hashApiKey(token);
