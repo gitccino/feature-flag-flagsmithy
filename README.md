@@ -27,3 +27,26 @@ A self-hostable **feature flag platform** built on the Next.js App Router. Flags
 | Cache / Rate limiting | [Upstash Redis](https://upstash.com/) + `@upstash/ratelimit`                                    |
 | UI                    | Radix UI + shadcn, Tailwind CSS v4, Lucide icons, Sonner toasts                                 |
 | Validation            | Zod                                                                                             |
+
+## Changing the database schema
+
+Migrations are files in `drizzle/`, committed to git and applied in order.
+`drizzle-kit push` is deliberately not available — it diffs the schema against
+the live database and silently drops whatever it cannot account for, which
+against real user data is unrecoverable.
+
+1. Edit `lib/db/schema.ts` — it is the single source of truth.
+2. `bun run db:generate` — writes a numbered `.sql` file plus a snapshot.
+3. **Read the generated SQL.** This is the review step, and the reason the
+   workflow exists. A `DROP COLUMN` you did not intend is caught here or not
+   at all.
+4. Commit the `.sql` and `drizzle/meta/` changes alongside the schema edit.
+5. `bun run db:migrate` — applies anything not yet recorded in the
+   `drizzle.__drizzle_migrations` table. Already-applied migrations are
+   skipped, so re-running is a no-op.
+
+`scripts/baseline-migrations.ts` is a spent one-off: this database predates the
+migration workflow, so its tables existed while the journal table was empty.
+The script recorded the five existing migrations as applied. It skips any entry
+already recorded, so re-running it is a no-op and a partial run can be safely
+repeated. Nothing needs to run it again.

@@ -24,6 +24,10 @@ Package manager: **Bun** (`bun.lock`). Use `bun install`, `bun add <pkg>`, `bun 
 
 Scripts: `bun run dev`, `bun run build`, `bun run start`, `bun run lint`.
 
+Schema changes go through migrations: `bun run db:generate` (write the SQL),
+review it, commit it, then `bun run db:migrate` (apply). There is no `db:push` —
+it drops columns to match the schema and would destroy user data. See the README.
+
 ---
 
 ## Core Principles
