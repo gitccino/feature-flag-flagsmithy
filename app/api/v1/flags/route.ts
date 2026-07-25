@@ -28,10 +28,33 @@ export function buildFlagMap(
   return result;
 }
 
-const INVALID_KEY = NextResponse.json(
-  { error: "invalid api key" },
-  { status: 401 },
-);
+// A Response body can only be read once, so these must be built per request
+// rather than shared as module-level constants.
+const invalidKey = () =>
+  NextResponse.json({ error: "invalid api key" }, { status: 401 });
+
+const invalidBody = () =>
+  NextResponse.json({ error: "invalid body" }, { status: 400 });
+
+type ParsedBody =
+  | { ok: true; identity: string | undefined }
+  | { ok: false; response: NextResponse };
+
+// Read the optional request body and validate it. An absent or empty body means
+// anonymous evaluation; malformed JSON or a bad identity is a 400.
+// Exported for unit testing (POST itself needs a live DB before it gets here).
+export async function parseBody(request: Request): Promise<ParsedBody> {
+  let raw: unknown = {};
+  try {
+    const text = await request.text();
+    if (text) raw = JSON.parse(text);
+  } catch {
+    return { ok: false, response: invalidBody() };
+  }
+  const parsed = evaluateFlagsSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, response: invalidBody() };
+  return { ok: true, identity: parsed.data.identity };
+}
 
 function tooManyRequests(retryAfter: number) {
   return NextResponse.json(
@@ -51,7 +74,7 @@ export async function POST(request: Request) {
 
   const token = parseBearer(request.headers.get("authorization"));
   // Reject requests that do not include a bearer token.
-  if (!token) return INVALID_KEY;
+  if (!token) return invalidKey();
 
   const keyHash = hashApiKey(token);
 
@@ -65,24 +88,14 @@ export async function POST(request: Request) {
     .where(eq(apiKeys.keyHash, keyHash))
     .limit(1);
 
-  if (!key || key.revokedAt) return INVALID_KEY;
+  if (!key || key.revokedAt) return invalidKey();
 
   const rate = await checkRateLimit(keyHash);
   if (!rate.allowed) return tooManyRequests(rate.retryAfter);
 
-  // Body is optional; tolerate an empty/no body but reject malformed JSON shapes.
-  let raw: unknown = {};
-  try {
-    const text = await request.text();
-    if (text) raw = JSON.parse(text);
-  } catch {
-    return NextResponse.json({ error: "invalid body" }, { status: 400 });
-  }
-  const parsed = evaluateFlagsSchema.safeParse(raw);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "invalid body" }, { status: 400 });
-  }
-  const identity = parsed.data.identity;
+  const body = await parseBody(request);
+  if (!body.ok) return body.response;
+  const identity = body.identity;
 
   // Cache hot path: Redis first, miss/outage falls back to Postgres.
   let states = await getEnvConfig(key.environmentId);

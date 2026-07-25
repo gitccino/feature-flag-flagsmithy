@@ -21,6 +21,7 @@ bun scripts/bucketing.test.ts \
 > `eval-endpoint.test.ts` needs the dummy `DATABASE_URL` so `lib/db` constructs at import — no connection is made.
 
 ### Bucketing — `bucketing.test.ts`
+
 - [x] Distribution: 50% rollout splits ~half (±2%, 10k sample)
 - [x] Monotonic: raising rollout never drops an already-in-bucket identity
 - [x] Determinism: same `(flagKey, identity)` → same bucket
@@ -28,26 +29,41 @@ bun scripts/bucketing.test.ts \
 - [x] Anonymous all-or-nothing (100% on; 99% / 0% off)
 
 ### Key crypto — `api-keys.test.ts`
+
 - [x] generate → hash → parse round-trip; format `fsk_<env>_…`
 - [x] hash stable, deterministic, `!=` plaintext
 - [x] `parseBearer` edge cases (null, case-insensitive scheme, empty token, no scheme)
 - [x] two generated keys differ
 
 ### Rate limit — `ratelimit.test.ts`
+
 - [x] per-key, no Redis → fail open (allowed, retryAfter 0)
-- [ +] per-IP, no Redis → fail open (`checkIpRateLimit` — gap #3, untested)
+- [x] per-IP, no Redis → fail open (`checkIpRateLimit`)
+
+> Both assert `redis === null` first. bun autoloads `.env.local`, so with real
+> Upstash creds present these passed against a live limiter that simply wasn't
+> over its cap — the fail-open branch never ran and the assertions were vacuous.
+> The env vars are now cleared before `lib/redis` is imported; keep that ordering.
 
 ### Endpoint — `eval-endpoint.test.ts`
+
 - [x] no Authorization header → 401
 - [x] non-Bearer scheme → 401
 - [x] map shape: keyed by flag key, single `enabled` bool, rollout % not exposed
 - [x] anonymous all-or-nothing
 - [x] deterministic per-identity across repeated calls
 - [x] empty env → `{}`
-- [ +] identity length cap: `{"identity":"x".repeat(201)}` → 400 (gap #1)
-- [ +] empty identity: `{"identity":""}` → 400 (confirm intended)
-- [ +] malformed JSON body → 400
-- [ +] wrong-type identity: `{"identity":123}` → 400
+- [x] identity length cap: `{"identity":"x".repeat(201)}` → 400 (200 chars still accepted)
+- [x] empty identity: `{"identity":""}` → 400
+- [x] malformed JSON body → 400
+- [x] wrong-type identity: `{"identity":123}` → 400
+- [x] absent / empty body → anonymous evaluation (not a 400)
+- [x] repeated 401s each carry a readable body (no shared module-level `Response`)
+
+> The four 400 paths are exercised through `parseBody`, the seam `POST` uses for
+> body validation — the handler reaches them only after a DB key lookup, so
+> testing them via `POST` would need live infra. That the route still routes
+> through the seam is covered by `[man]` curl below, not by these tests.
 
 ---
 
@@ -63,7 +79,7 @@ Needs live DB + Redis + a minted key (`bun scripts/mint-key.ts`).
 - [man] Stability: raise flag 10→20% in admin → previously-on identities stay on
 - [man] Immediate invalidation: toggle flag in admin → next eval reflects it (DEL fired, no 5-min TTL wait)
 - [man] Per-key 429: exceed 100/10s on one key → 429 + `Retry-After`
-- [man] Per-IP 429 (gap #3): spam bad keys past 300/10s from one IP → 429 *before* the DB lookup
+- [man] Per-IP 429 (gap #3): spam bad keys past 300/10s from one IP → 429 _before_ the DB lookup
 - [man] Redis-down degradation: remove Upstash creds → still serves from Postgres, no 500, no limiting
 - [man] Audit: `createApiKey` writes `audit_logs` row (`entityType:"api_key"`, `environmentId` set, no secret in diff)
 - [man] Env isolation: a key for env A never returns env B's flags
@@ -71,6 +87,7 @@ Needs live DB + Redis + a minted key (`bun scripts/mint-key.ts`).
 ---
 
 ## Pre-merge housekeeping
+
 - [ ] `bunx tsc --noEmit` clean
 - [ ] `bun run lint` clean
 - [ ] `bun run db:push` against the real DB (drops `last_used_at`, applies `api_keys`)
