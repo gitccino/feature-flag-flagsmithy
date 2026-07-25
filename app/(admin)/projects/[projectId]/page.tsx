@@ -4,9 +4,6 @@ import { CreateFlagDialog } from "@/components/flags/create-flag-dialog";
 import { FlagsTable } from "@/components/flags/flags-table";
 import { listProjectFlags } from "@/lib/queries/flags";
 
-// Testing purpose
-// import { FlagsTable as TestFlagsTable } from "@/components/my-components/flags-table";
-
 export default async function ProjectFlagsPage({
   params,
 }: {

@@ -46,6 +46,7 @@ NOTE.md
 .agents/
 .cursor/
 .claude/
+.vscode/
 skills-lock.json
 
 plans
