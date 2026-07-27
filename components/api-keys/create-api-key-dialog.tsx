@@ -59,7 +59,7 @@ export function CreateApiKeyDialog({
     handleSubmit,
     reset,
     setError,
-    formState: { errors, isSubmitting },
+    formState: { isSubmitting },
   } = useForm<CreateApiKeyInput>({
     resolver: zodResolver(createApiKeySchema),
     defaultValues,
@@ -87,7 +87,7 @@ export function CreateApiKeyDialog({
       } else if (environmentError) {
         setError("environmentId", { message: environmentError });
       } else {
-        setError("root", { message: result.error });
+        toast.error(result.error);
       }
       return;
     }
@@ -174,7 +174,6 @@ export function CreateApiKeyDialog({
                     </Field>
                   )}
                 />
-                {errors.root && <FieldError errors={[errors.root]} />}
               </FieldGroup>
             </form>
 

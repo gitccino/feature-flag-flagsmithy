@@ -16,7 +16,6 @@ export default async function SettingsPage({
     .flatMap((environment) =>
       environment.apiKeys.map((key) => ({
         ...key,
-        environmentId: environment.id,
         environmentName: environment.name,
       })),
     )

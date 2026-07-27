@@ -20,16 +20,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { ProjectApiKey } from "@/lib/queries/api-keys";
 
-export type ApiKeyRow = {
-  id: string;
-  name: string;
-  keyPrefix: string;
-  createdAt: Date;
-  revokedAt: Date | null;
-  environmentId: string;
-  environmentName: string;
-};
+/** A key row as the settings page flattens it: the DB row plus its env name. */
+export type ApiKeyRow = ProjectApiKey & { environmentName: string };
 
 // Locale and timezone are both pinned: an unpinned formatter renders the
 // server's day and the client's day differently either side of midnight, which

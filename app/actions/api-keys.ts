@@ -91,25 +91,33 @@ export async function createApiKey(
 
   const { plaintext, keyPrefix, keyHash } = generateApiKey(environment.key);
 
-  const data = await dbPool.transaction(async (tx) => {
-    const [key] = await tx
-      .insert(apiKeys)
-      .values({ environmentId, name, keyPrefix, keyHash })
-      .returning({ id: apiKeys.id });
+  let data: { id: string };
+  try {
+    data = await dbPool.transaction(async (tx) => {
+      const [key] = await tx
+        .insert(apiKeys)
+        .values({ environmentId, name, keyPrefix, keyHash })
+        .returning({ id: apiKeys.id });
 
-    await tx.insert(auditLogs).values({
-      actorId: actor.session.user.id,
-      projectId: environment.projectId,
-      environmentId,
-      entityType: "api_key",
-      entityId: key.id,
-      action: "create",
-      after: { name, keyPrefix }, // no secret in the diff
-      metadata: { ip: actor.ip, userAgent: actor.userAgent },
+      await tx.insert(auditLogs).values({
+        actorId: actor.session.user.id,
+        projectId: environment.projectId,
+        environmentId,
+        entityType: "api_key",
+        entityId: key.id,
+        action: "create",
+        after: { name, keyPrefix }, // no secret in the diff
+        metadata: { ip: actor.ip, userAgent: actor.userAgent },
+      });
+
+      return { id: key.id };
     });
-
-    return { id: key.id };
-  });
+  } catch (err) {
+    // Never let this reject across the client boundary (principle 6). The
+    // plaintext dies with the rolled-back txn, so there is nothing to leak.
+    console.error("createApiKey failed", err);
+    return { ok: false, error: "Could not create API key. Please try again." };
+  }
 
   updateTag(cacheTags.apiKeys(environment.projectId));
 
@@ -168,26 +176,37 @@ export async function revokeApiKey(
 
   const revokedAt = new Date();
 
-  await dbPool.transaction(async (tx) => {
-    await tx.update(apiKeys).set({ revokedAt }).where(eq(apiKeys.id, apiKeyId));
+  try {
+    await dbPool.transaction(async (tx) => {
+      await tx
+        .update(apiKeys)
+        .set({ revokedAt })
+        .where(eq(apiKeys.id, apiKeyId));
 
-    await tx.insert(auditLogs).values({
-      actorId: actor.session.user.id,
-      projectId: environment.projectId,
-      environmentId: existing.environmentId,
-      entityType: "api_key",
-      entityId: apiKeyId,
-      action: "revoke",
-      // prefix + name only — no secret material in the diff
-      before: { name: existing.name, keyPrefix: existing.keyPrefix },
-      after: {
-        name: existing.name,
-        keyPrefix: existing.keyPrefix,
-        revokedAt: revokedAt.toISOString(),
-      },
-      metadata: { ip: actor.ip, userAgent: actor.userAgent },
+      await tx.insert(auditLogs).values({
+        actorId: actor.session.user.id,
+        projectId: environment.projectId,
+        environmentId: existing.environmentId,
+        entityType: "api_key",
+        entityId: apiKeyId,
+        action: "revoke",
+        // prefix + name only — no secret material in the diff
+        before: { name: existing.name, keyPrefix: existing.keyPrefix },
+        after: {
+          name: existing.name,
+          keyPrefix: existing.keyPrefix,
+          revokedAt: revokedAt.toISOString(),
+        },
+        metadata: { ip: actor.ip, userAgent: actor.userAgent },
+      });
     });
-  });
+  } catch (err) {
+    // Never reject across the client boundary (principle 6). The txn rolled
+    // back, so the key is still live and the caller must be told to retry —
+    // silently reporting success on a failed revoke is the dangerous outcome.
+    console.error("revokeApiKey failed", err);
+    return { ok: false, error: "Could not revoke the key. Please try again." };
+  }
 
   updateTag(cacheTags.apiKeys(environment.projectId));
 
