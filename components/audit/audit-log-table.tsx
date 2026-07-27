@@ -39,7 +39,7 @@ const ACTION_VARIANTS: Record<string, "secondary" | "outline" | "destructive"> =
   }
 
 function AuditDiff({ entry }: { entry: ProjectAuditLog }) {
-  const rows = auditDiffRows(entry.before, entry.after)
+  const rows = auditDiffRows(entry.before, entry.after, entry.entityType)
 
   if (rows.length === 0) {
     return <span className="text-muted-foreground text-sm">—</span>
@@ -71,6 +71,7 @@ export function AuditLogTable({ entries }: { entries: ProjectAuditLog[] }) {
           <TableHead className="w-44">When</TableHead>
           <TableHead className="w-40">Who</TableHead>
           <TableHead className="w-28">Entity</TableHead>
+          <TableHead className="w-48">Target</TableHead>
           <TableHead className="w-24">Action</TableHead>
           <TableHead>Change</TableHead>
         </TableRow>
@@ -90,6 +91,23 @@ export function AuditLogTable({ entries }: { entries: ProjectAuditLog[] }) {
             </TableCell>
             <TableCell className="text-sm">
               {ENTITY_LABELS[entry.entityType] ?? entry.entityType}
+            </TableCell>
+            <TableCell className="text-sm">
+              {/* Which flag, and in which environment — without these the
+                  diff alone can't answer "who turned this flag on in
+                  production". Either can be absent: only flag entries have a
+                  key to resolve, and only env-scoped entries have an env. */}
+              {entry.targetKey ? (
+                <span className="font-mono text-xs">{entry.targetKey}</span>
+              ) : null}
+              {entry.environmentName ? (
+                <span className="text-muted-foreground ml-1.5 text-xs">
+                  {entry.environmentName}
+                </span>
+              ) : null}
+              {!entry.targetKey && !entry.environmentName ? (
+                <span className="text-muted-foreground">—</span>
+              ) : null}
             </TableCell>
             <TableCell>
               <Badge variant={ACTION_VARIANTS[entry.action] ?? "outline"}>

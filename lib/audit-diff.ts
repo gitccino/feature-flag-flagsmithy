@@ -10,7 +10,14 @@
  * `name` + `keyPrefix` only, never the plaintext or hash. This is the second
  * line of defence — the diff is rendered verbatim, so a future writer that
  * slips a secret into the payload must not surface it on the audit page.
+ *
+ * For `api_key` entries the filter is an allowlist, because that is the one
+ * entity whose payload sits next to real secret material and a denylist there
+ * fails open — an unforeseen field name renders. Every other entity uses the
+ * denylist: their payloads are ordinary config, and an allowlist would
+ * silently swallow fields as the schema grows.
  */
+const API_KEY_VISIBLE_FIELDS = new Set(["name", "keyPrefix", "revokedAt"])
 const REDACTED_KEY = /hash|secret|token|password|plaintext|credential/i
 
 export type AuditDiffRow = {
@@ -38,14 +45,25 @@ export function formatAuditValue(value: unknown): string {
  * Changed fields only, in first-seen order (before's keys, then after's).
  * A create has no `before` so every field shows as added; a delete has no
  * `after` so every field shows as removed.
+ *
+ * `entityType` selects the redaction strategy; an unrecognised type gets the
+ * denylist, so a new writer is never accidentally exempt from filtering.
  */
-export function auditDiffRows(before: unknown, after: unknown): AuditDiffRow[] {
+export function auditDiffRows(
+  before: unknown,
+  after: unknown,
+  entityType?: string,
+): AuditDiffRow[] {
   const beforeFields = fields(before)
   const afterFields = fields(after)
   const keys = new Set([...beforeFields.keys(), ...afterFields.keys()])
+  const visible =
+    entityType === "api_key"
+      ? (key: string) => API_KEY_VISIBLE_FIELDS.has(key)
+      : (key: string) => !REDACTED_KEY.test(key)
 
   return [...keys]
-    .filter((key) => !REDACTED_KEY.test(key))
+    .filter(visible)
     .map((key) => ({
       key,
       before: formatAuditValue(beforeFields.get(key)),

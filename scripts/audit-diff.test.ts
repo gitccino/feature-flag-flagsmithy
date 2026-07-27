@@ -22,18 +22,59 @@ assert.deepEqual(
   [{ key: "enabled", before: "false", after: "true" }],
 )
 
-// Secret-looking keys never reach the page, even if a writer puts them there.
+// api_key entries are allowlisted: only name/keyPrefix/revokedAt render, so
+// an unforeseen field name fails closed rather than leaking.
 assert.deepEqual(
-  auditDiffRows(null, {
-    name: "CI key",
-    keyPrefix: "fsk_dev_ab12",
-    keyHash: "d0d0deadbeef",
-    plaintext: "fsk_dev_ab12_supersecret",
-  }),
+  auditDiffRows(
+    null,
+    {
+      name: "CI key",
+      keyPrefix: "fsk_dev_ab12",
+      keyHash: "d0d0deadbeef",
+      plaintext: "fsk_dev_ab12_supersecret",
+      // a field no denylist pattern would have caught
+      apiKey: "fsk_dev_ab12_supersecret",
+    },
+    "api_key",
+  ),
   [
     { key: "name", before: "—", after: "CI key" },
     { key: "keyPrefix", before: "—", after: "fsk_dev_ab12" },
   ],
+)
+
+// A revoke renders its timestamp — revokedAt is on the allowlist.
+assert.deepEqual(
+  auditDiffRows(
+    { name: "CI key", keyPrefix: "fsk_dev_ab12" },
+    {
+      name: "CI key",
+      keyPrefix: "fsk_dev_ab12",
+      revokedAt: "2026-07-27T10:00:00.000Z",
+    },
+    "api_key",
+  ),
+  [
+    {
+      key: "revokedAt",
+      before: "—",
+      after: "2026-07-27T10:00:00.000Z",
+    },
+  ],
+)
+
+// Every other entity keeps the denylist: ordinary config renders, secrets
+// don't. A flag's `key` is a real field, not secret material.
+assert.deepEqual(
+  auditDiffRows(null, { key: "checkout", secretToken: "abc" }, "flag"),
+  [{ key: "key", before: "—", after: "checkout" }],
+)
+
+// An unrecognised entity type falls back to the denylist — a new writer is
+// never accidentally exempt from filtering.
+assert.deepEqual(
+  auditDiffRows(null, { name: "x", passwordHash: "abc" }, "something_new"),
+  [{ key: "name", before: "—", after: "x" }],
 )
 
 // jsonb is untyped: a non-object payload must diff as empty, not throw.
