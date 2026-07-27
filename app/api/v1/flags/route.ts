@@ -78,6 +78,11 @@ export async function POST(request: Request) {
 
   const keyHash = hashApiKey(token);
 
+  // This lookup MUST stay an uncached Postgres read. It is what makes revoke
+  // instant: revokeApiKey only stamps revokedAt, so the next request here sees
+  // it and 401s. Moving this into Redis alongside the env config below would
+  // silently delay revocation by up to the cache TTL (5 minutes) — on a leaked
+  // credential, that window is the entire incident.
   const [key] = await db
     .select({
       id: apiKeys.id,

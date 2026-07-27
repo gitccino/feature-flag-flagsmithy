@@ -69,7 +69,9 @@ bun scripts/bucketing.test.ts \
 
 ## Manual
 
-Needs live DB + Redis + a minted key (`bun scripts/mint-key.ts`).
+Needs live DB + Redis + a key minted from the project settings page
+(`/projects/:id/settings` → New API key). `scripts/mint-key.ts` was deleted in
+#12 — the UI replaced it.
 
 - [man] Mint key → plaintext returned once; row stores only `keyPrefix` + `keyHash`, no plaintext
 - [man] `curl -XPOST /api/v1/flags -H "Authorization: Bearer fsk_…" -d '{"identity":"user-1"}'` → 200 map
@@ -91,5 +93,5 @@ Needs live DB + Redis + a minted key (`bun scripts/mint-key.ts`).
 - [ ] `bunx tsc --noEmit` clean
 - [ ] `bun run lint` clean
 - [ ] `bun run db:push` against the real DB (drops `last_used_at`, applies `api_keys`)
-- [ ] Decide `scripts/mint-key.ts` — dev-only, bypasses auth/audit. Keep or delete before merge.
+- [x] Decide `scripts/mint-key.ts` — deleted in #12; the settings-page UI is the only issuance path.
 - [ ] PR #8 description notes the `{"identity":""}` → 400 behavior change
