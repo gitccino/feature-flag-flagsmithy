@@ -1,14 +1,14 @@
-"use client";
+"use client"
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, Copy, KeyRound, TriangleAlert } from "lucide-react";
-import { useRouter } from "next/navigation";
-import * as React from "react";
-import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
+import { zodResolver } from "@hookform/resolvers/zod"
+import { Check, Copy, KeyRound, TriangleAlert } from "lucide-react"
+import { useRouter } from "next/navigation"
+import * as React from "react"
+import { Controller, useForm } from "react-hook-form"
+import { toast } from "sonner"
 
-import { createApiKey } from "@/app/actions/api-keys";
-import { Button } from "@/components/ui/button";
+import { createApiKey } from "@/app/actions/api-keys"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogClose,
@@ -18,41 +18,39 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/components/ui/dialog"
 import {
   Field,
   FieldError,
   FieldGroup,
   FieldLabel,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+} from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { createApiKeySchema, type CreateApiKeyInput } from "@/lib/zod-schema";
+} from "@/components/ui/select"
+import { createApiKeySchema, type CreateApiKeyInput } from "@/lib/zod-schema"
 
 type CreateApiKeyDialogProps = {
-  environments: { id: string; name: string }[];
-};
+  environments: { id: string; name: string }[]
+}
 
-export function CreateApiKeyDialog({
-  environments,
-}: CreateApiKeyDialogProps) {
-  const router = useRouter();
-  const formId = React.useId();
-  const [open, setOpen] = React.useState(false);
+export function CreateApiKeyDialog({ environments }: CreateApiKeyDialogProps) {
+  const router = useRouter()
+  const formId = React.useId()
+  const [open, setOpen] = React.useState(false)
   // Set once, on success. While non-null the dialog shows the reveal step —
   // this is the only moment the plaintext exists anywhere outside the client.
-  const [plaintext, setPlaintext] = React.useState<string | null>(null);
+  const [plaintext, setPlaintext] = React.useState<string | null>("something")
 
   const defaultValues: CreateApiKeyInput = {
     environmentId: environments[0]?.id ?? "",
     name: "",
-  };
+  }
 
   const {
     control,
@@ -63,38 +61,38 @@ export function CreateApiKeyDialog({
   } = useForm<CreateApiKeyInput>({
     resolver: zodResolver(createApiKeySchema),
     defaultValues,
-  });
+  })
 
   function onOpenChange(next: boolean) {
-    setOpen(next);
+    setOpen(next)
     if (!next) {
       // Drop the plaintext from memory as soon as the dialog closes. Reopening
       // starts a fresh create — there is no way back to a key already shown.
-      setPlaintext(null);
-      reset(defaultValues);
-      router.refresh();
+      setPlaintext(null)
+      reset(defaultValues)
+      router.refresh()
     }
   }
 
   const onSubmit = handleSubmit(async (values) => {
-    const result = await createApiKey(values);
+    const result = await createApiKey(values)
 
     if (!result.ok) {
-      const nameError = result.fieldErrors?.name?.[0];
-      const environmentError = result.fieldErrors?.environmentId?.[0];
+      const nameError = result.fieldErrors?.name?.[0]
+      const environmentError = result.fieldErrors?.environmentId?.[0]
       if (nameError) {
-        setError("name", { message: nameError });
+        setError("name", { message: nameError })
       } else if (environmentError) {
-        setError("environmentId", { message: environmentError });
+        setError("environmentId", { message: environmentError })
       } else {
-        toast.error(result.error);
+        toast.error(result.error)
       }
-      return;
+      return
     }
 
-    setPlaintext(result.data.plaintext);
-    toast.success("API key created");
-  });
+    setPlaintext(result.data.plaintext)
+    toast.success("API key created")
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -191,23 +189,23 @@ export function CreateApiKeyDialog({
         )}
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
 function RevealedKey({ plaintext }: { plaintext: string }) {
-  const [copied, setCopied] = React.useState(false);
+  const [copied, setCopied] = React.useState(false)
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(plaintext);
-      setCopied(true);
+      await navigator.clipboard.writeText(plaintext)
+      setCopied(true)
       // ponytail: no timer cleanup — the dialog unmounts on close and a stale
       // setState on an unmounted component is a no-op in React 19.
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 2000)
     } catch {
       // Clipboard is blocked on insecure origins and by some permission
       // policies. The key is selectable in the field below either way.
-      toast.error("Could not copy. Select the key and copy it manually.");
+      toast.error("Could not copy. Select the key and copy it manually.")
     }
   }
 
@@ -251,5 +249,5 @@ function RevealedKey({ plaintext }: { plaintext: string }) {
         </DialogClose>
       </DialogFooter>
     </>
-  );
+  )
 }

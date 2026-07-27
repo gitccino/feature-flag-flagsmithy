@@ -169,7 +169,8 @@ export async function revokeApiKey(
   if (!environment) {
     return { ok: false, error: "API key not found." };
   }
-
+  // Same message as the missing case above — a distinct "not yours" would
+  // confirm the id is real to someone who doesn't own it.
   if (existing.revokedAt) {
     return { ok: false, error: "This key is already revoked." };
   }

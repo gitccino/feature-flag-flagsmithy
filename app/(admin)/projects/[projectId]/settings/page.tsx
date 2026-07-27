@@ -1,26 +1,25 @@
-import { KeyRound } from "lucide-react";
+import { KeyRound } from "lucide-react"
 
-import { ApiKeysTable } from "@/components/api-keys/api-keys-table";
-import { CreateApiKeyDialog } from "@/components/api-keys/create-api-key-dialog";
-import { listProjectApiKeys } from "@/lib/queries/api-keys";
+import { ApiKeysTable } from "@/components/api-keys/api-keys-table"
+import { CreateApiKeyDialog } from "@/components/api-keys/create-api-key-dialog"
+import { listProjectApiKeys } from "@/lib/queries/api-keys"
 
 export default async function SettingsPage({
   params,
 }: {
-  params: Promise<{ projectId: string }>;
+  params: Promise<{ projectId: string }>
 }) {
-  const { projectId } = await params;
-  const environments = await listProjectApiKeys(projectId);
+  const { projectId } = await params
+  const environments = await listProjectApiKeys(projectId)
   // flatten to one newest-first list — the environment is a column, not a section
   const keys = environments
     .flatMap((environment) =>
       environment.apiKeys.map((key) => ({
         ...key,
         environmentName: environment.name,
-      })),
+      }))
     )
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
@@ -50,5 +49,5 @@ export default async function SettingsPage({
         <ApiKeysTable keys={keys} />
       )}
     </div>
-  );
+  )
 }

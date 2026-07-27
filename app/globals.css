@@ -62,6 +62,10 @@
   border: 0.5px solid #faf9f510;
 }
 
+.br {
+    border: 0.5px solid #ff8181;
+}
+
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
