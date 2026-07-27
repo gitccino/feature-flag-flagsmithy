@@ -103,6 +103,8 @@ export async function createProject(
       // 4. read-your-writes: expire this owner's projects list so the next
       // read fetches fresh data (the list query tags itself with the same key)
       updateTag(cacheTags.projects(session.user.id));
+      // the txn wrote an audit row too — expire the trail alongside it
+      updateTag(cacheTags.auditLogs(data.id));
 
       return { ok: true, data };
     } catch (err) {
