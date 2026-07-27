@@ -45,7 +45,7 @@ export function CreateApiKeyDialog({ environments }: CreateApiKeyDialogProps) {
   const [open, setOpen] = React.useState(false)
   // Set once, on success. While non-null the dialog shows the reveal step —
   // this is the only moment the plaintext exists anywhere outside the client.
-  const [plaintext, setPlaintext] = React.useState<string | null>("something")
+  const [plaintext, setPlaintext] = React.useState<string | null>(null)
 
   const defaultValues: CreateApiKeyInput = {
     environmentId: environments[0]?.id ?? "",
