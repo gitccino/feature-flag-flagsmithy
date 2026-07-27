@@ -135,6 +135,12 @@ export const createApiKeySchema = z.object({
 
 export type CreateApiKeyInput = z.infer<typeof createApiKeySchema>;
 
+export const revokeApiKeySchema = z.object({
+  apiKeyId: z.uuid("Invalid API key id."),
+});
+
+export type RevokeApiKeyInput = z.infer<typeof revokeApiKeySchema>;
+
 export const evaluateFlagsSchema = z.object({
   identity: z.string().min(1).max(200).optional(),
 });

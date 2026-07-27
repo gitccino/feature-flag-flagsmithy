@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import { generateApiKey, hashApiKey, parseBearer } from "@/lib/api-keys";
+import { revokeApiKeySchema } from "@/lib/zod-schema";
 
 // generate -> hash -> parse round-trip
 const { plaintext, keyPrefix, keyHash } = generateApiKey("production");
@@ -24,5 +25,23 @@ assert.equal(parseBearer("abc"), null, "no scheme -> null");
 
 // uniqueness: two keys differ
 assert.notEqual(generateApiKey("staging").plaintext, generateApiKey("staging").plaintext);
+
+// The stored prefix is displayed in the admin UI, so it must not be usable as a
+// credential: hashing it can never produce the stored hash the endpoint looks up.
+assert.notEqual(hashApiKey(keyPrefix), keyHash, "prefix does not authenticate");
+assert.ok(
+  keyPrefix.length < plaintext.length,
+  "prefix is a truncation, not the whole key",
+);
+
+// Revoke input is uuid-only — a non-uuid must never reach the DB as a raw cast.
+assert.equal(revokeApiKeySchema.safeParse({ apiKeyId: "nope" }).success, false);
+assert.equal(revokeApiKeySchema.safeParse({}).success, false);
+assert.equal(
+  revokeApiKeySchema.safeParse({
+    apiKeyId: "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+  }).success,
+  true,
+);
 
 console.log("api-keys round-trip ok");

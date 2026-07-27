@@ -1,14 +1,21 @@
 "use server";
 
 import { eq } from "drizzle-orm";
+import { updateTag } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
 
 import { generateApiKey } from "@/lib/api-keys";
 import { auth } from "@/lib/auth";
+import { cacheTags } from "@/lib/cache-tags";
 import { db, dbPool } from "@/lib/db";
 import { apiKeys, auditLogs, environments, projects } from "@/lib/db/schema";
-import { createApiKeySchema, type CreateApiKeyInput } from "@/lib/zod-schema";
+import {
+  createApiKeySchema,
+  revokeApiKeySchema,
+  type CreateApiKeyInput,
+  type RevokeApiKeyInput,
+} from "@/lib/zod-schema";
 
 type ActionError = {
   ok: false;
@@ -30,6 +37,26 @@ async function resolveActor() {
     ip: headersList.get("x-forwarded-for")?.split(",")[0]?.trim(),
     userAgent: headersList.get("user-agent") ?? undefined,
   };
+}
+
+/**
+ * Resolve an environment's owning project and re-check ownership.
+ * Both key actions are scoped by environment, so this is the single
+ * authorization seam — proxy is optimistic only (CLAUDE.md principle 5).
+ * Returns null for both "missing" and "not owned" so existence never leaks.
+ */
+async function requireOwnedEnvironment(environmentId: string, userId: string) {
+  const environment = await db.query.environments.findFirst({
+    where: eq(environments.id, environmentId),
+  });
+  if (!environment) return null;
+
+  const project = await db.query.projects.findFirst({
+    where: eq(projects.id, environment.projectId),
+  });
+  if (!project || project.createdBy !== userId) return null;
+
+  return environment;
 }
 
 export type CreateApiKeyResult =
@@ -54,18 +81,11 @@ export async function createApiKey(
 
   const { environmentId, name } = parsed.data;
 
-  // resolve the owning project from the environment, then re-check ownership
-  const environment = await db.query.environments.findFirst({
-    where: eq(environments.id, environmentId),
-  });
+  const environment = await requireOwnedEnvironment(
+    environmentId,
+    actor.session.user.id,
+  );
   if (!environment) {
-    return { ok: false, error: "Environment not found." };
-  }
-
-  const project = await db.query.projects.findFirst({
-    where: eq(projects.id, environment.projectId),
-  });
-  if (!project || project.createdBy !== actor.session.user.id) {
     return { ok: false, error: "Environment not found." };
   }
 
@@ -91,5 +111,85 @@ export async function createApiKey(
     return { id: key.id };
   });
 
+  updateTag(cacheTags.apiKeys(environment.projectId));
+
   return { ok: true, data: { id: data.id, keyPrefix, plaintext } };
+}
+
+export type RevokeApiKeyResult = ActionSuccess<{ id: string }> | ActionError;
+
+/**
+ * Soft revoke: stamp revokedAt, never delete the row. The audit trail keeps
+ * pointing at a real key and an id is never recycled. Takes effect on the very
+ * next evaluation request because that lookup reads Postgres uncached.
+ */
+export async function revokeApiKey(
+  input: RevokeApiKeyInput,
+): Promise<RevokeApiKeyResult> {
+  const parsed = revokeApiKeySchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Invalid API key.",
+      fieldErrors: z.flattenError(parsed.error).fieldErrors,
+    };
+  }
+
+  const actor = await resolveActor();
+  if (!actor.ok) return actor;
+
+  const { apiKeyId } = parsed.data;
+
+  const existing = await db.query.apiKeys.findFirst({
+    where: eq(apiKeys.id, apiKeyId),
+    columns: {
+      id: true,
+      name: true,
+      keyPrefix: true,
+      environmentId: true,
+      revokedAt: true,
+    },
+  });
+  if (!existing) {
+    return { ok: false, error: "API key not found." };
+  }
+
+  const environment = await requireOwnedEnvironment(
+    existing.environmentId,
+    actor.session.user.id,
+  );
+  if (!environment) {
+    return { ok: false, error: "API key not found." };
+  }
+
+  if (existing.revokedAt) {
+    return { ok: false, error: "This key is already revoked." };
+  }
+
+  const revokedAt = new Date();
+
+  await dbPool.transaction(async (tx) => {
+    await tx.update(apiKeys).set({ revokedAt }).where(eq(apiKeys.id, apiKeyId));
+
+    await tx.insert(auditLogs).values({
+      actorId: actor.session.user.id,
+      projectId: environment.projectId,
+      environmentId: existing.environmentId,
+      entityType: "api_key",
+      entityId: apiKeyId,
+      action: "revoke",
+      // prefix + name only — no secret material in the diff
+      before: { name: existing.name, keyPrefix: existing.keyPrefix },
+      after: {
+        name: existing.name,
+        keyPrefix: existing.keyPrefix,
+        revokedAt: revokedAt.toISOString(),
+      },
+      metadata: { ip: actor.ip, userAgent: actor.userAgent },
+    });
+  });
+
+  updateTag(cacheTags.apiKeys(environment.projectId));
+
+  return { ok: true, data: { id: apiKeyId } };
 }
