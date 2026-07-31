@@ -263,7 +263,7 @@ Is this expensive? Bounded, and small: a project has exactly 3 environments, and
 one row per flag. The comment says so, because "this is fine" is only useful to
 a future reader if the *reason* is attached.
 
-### 3d. Two ids, one map
+### 3d. Two ids, one map — and the fallback behind them
 
 ```ts
 const flagKeys = new Map<string, string>()
@@ -284,17 +284,40 @@ is a single `.get()` with no branching on `entityType`.
 Then:
 
 ```ts
-targetKey: flagKeys.get(entry.entityId) ?? null,
+targetLabel:
+  flagKeys.get(entry.entityId) ?? auditPayloadName(entry.before, entry.after),
 ```
 
-`??` (nullish coalescing) not `||` — though here they'd behave the same, since
-`.get()` returns `undefined` for a miss. The habit matters elsewhere: `||` would
-also replace an empty string or `0`, which is a classic silent bug.
+`??` (nullish coalescing) not `||`. Here they'd behave the same since `.get()`
+returns `undefined` on a miss, but the habit matters: `||` also replaces `""`
+and `0`, a classic silent bug.
 
-A miss means the flag was **deleted**. That's not an error — the row is gone,
-so there's no key left to look up. The comment notes the delete entry's own
-`before` diff still carries the key, so the information isn't actually lost from
-the page.
+**The fallback is the interesting half, and it came from running the code
+against real data.** The map only knows about flags. An API key entry misses it
+— and a revoke's payload has an identical `name` and `keyPrefix` on both sides,
+so the changed-fields-only filter drops them too. The row rendered as:
+
+```
+api_key / revoke | Development | revokedAt: — → 2026-07-27T10:26:08.047Z
+```
+
+Which key? No way to tell. Same class of bug the reviewer caught for flags —
+the diff alone doesn't identify its subject — but in a spot no offline test
+covered, because every fixture was written by the same person who wrote the
+code. Real rows had a shape none of the fixtures did.
+
+`auditPayloadName` reads `after` first, then `before`: a rename should show the
+new name, but a delete has no `after` at all. It reuses the same `fields()`
+narrowing from Stage 2, so a non-object payload gives `null` rather than
+throwing — one guard, both call sites.
+
+Note the rename: `targetKey` → `targetLabel`. Once the value could be a flag
+key *or* a display name, the old name was a small lie. It also drove a styling
+change — `font-mono` suits a key, not a name like `CI key`.
+
+**Lesson worth more than the fix:** tests written alongside the code test the
+shapes the author already had in mind. Production data is the only source of
+shapes nobody imagined.
 
 ### 3e. The derived type
 
@@ -498,11 +521,18 @@ in `lib/`; it was moved to match.)
 
 What's tested is exactly the logic that could silently be wrong: the three diff
 shapes (create/update/delete), both redaction strategies, the unknown-entity
-fallback, and non-object jsonb. What isn't tested: the query (needs a live DB)
-and the table (needs a renderer). Those are covered by `bun run build` type-
-checking and by using it.
+fallback, non-object jsonb, and the payload-name fallback. What isn't tested:
+the query (needs a live DB) and the table (needs a renderer).
 
 Run it: `bunx tsx scripts/audit-diff.test.ts`
+
+**And then don't stop there.** These tests all passed while the API-key rows
+were unidentifiable (Stage 3d). A throwaway script that ran the real query
+against the real database found it in one go. That script wasn't kept — it had
+served its purpose — but writing one before merging anything data-shaped is a
+habit worth having. Note it must run with `bun`, not `bunx tsx`: `bun` loads
+`.env.local` automatically, and without `DATABASE_URL` the Drizzle client
+throws at import.
 
 **Exercise:** delete the `Array.isArray(value)` check in `lib/audit-diff.ts` and
 re-run. Which assertion fails, and does the failure message tell you what broke?
@@ -557,3 +587,7 @@ is a skill worth more than the code.
    its upgrade path is a decision; a bare `100` is debt.
 5. **Never trust an outer layer for authorization.** Layouts, proxies and
    middleware are conveniences. Re-check where the data is actually touched.
+6. **Run it against real data before you call it done.** Your fixtures encode
+   the shapes you already thought of. The API-key bug in Stage 3d survived a
+   green test suite, a passing build, and a two-axis code review — and died the
+   first time the query touched a real table.

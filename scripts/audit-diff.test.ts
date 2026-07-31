@@ -1,6 +1,10 @@
 import assert from "node:assert/strict"
 
-import { auditDiffRows, formatAuditValue } from "@/lib/audit-diff"
+import {
+  auditDiffRows,
+  auditPayloadName,
+  formatAuditValue,
+} from "@/lib/audit-diff"
 
 // A create has no `before` — every field reads as added.
 assert.deepEqual(auditDiffRows(null, { name: "Checkout", key: "checkout" }), [
@@ -89,5 +93,31 @@ assert.equal(formatAuditValue("Checkout"), "Checkout")
 assert.equal(formatAuditValue(0), "0")
 assert.equal(formatAuditValue(false), "false")
 assert.equal(formatAuditValue({ a: 1 }), '{"a":1}')
+
+// An API key revoke leaves name and keyPrefix unchanged, so the diff drops
+// both — the payload name is the only thing left identifying which key.
+assert.equal(
+  auditPayloadName(
+    { name: "CI key", keyPrefix: "fsk_dev_ab12" },
+    {
+      name: "CI key",
+      keyPrefix: "fsk_dev_ab12",
+      revokedAt: "2026-07-27T10:00:00.000Z",
+    },
+  ),
+  "CI key",
+)
+
+// A rename shows the new name: `after` wins over `before`.
+assert.equal(auditPayloadName({ name: "Old" }, { name: "New" }), "New")
+
+// A delete has no `after` at all — fall back to `before`.
+assert.equal(auditPayloadName({ name: "Gone" }, null), "Gone")
+
+// No name to find, or an unusable one, is null rather than a blank label.
+assert.equal(auditPayloadName(null, { enabled: true }), null)
+assert.equal(auditPayloadName(null, { name: "" }), null)
+assert.equal(auditPayloadName(null, { name: 42 }), null)
+assert.equal(auditPayloadName("nope", null), null)
 
 console.log("audit-diff.test.ts OK")

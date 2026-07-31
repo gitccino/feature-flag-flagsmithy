@@ -93,19 +93,18 @@ export function AuditLogTable({ entries }: { entries: ProjectAuditLog[] }) {
               {ENTITY_LABELS[entry.entityType] ?? entry.entityType}
             </TableCell>
             <TableCell className="text-sm">
-              {/* Which flag, and in which environment — without these the
-                  diff alone can't answer "who turned this flag on in
-                  production". Either can be absent: only flag entries have a
-                  key to resolve, and only env-scoped entries have an env. */}
-              {entry.targetKey ? (
-                <span className="font-mono text-xs">{entry.targetKey}</span>
-              ) : null}
+              {/* What was touched, and in which environment — without these
+                  the diff alone can't answer "who turned this flag on in
+                  production". Either can be absent: a segment entry has no
+                  name to resolve yet, and only env-scoped entries have an
+                  env. */}
+              {entry.targetLabel ? <span>{entry.targetLabel}</span> : null}
               {entry.environmentName ? (
                 <span className="text-muted-foreground ml-1.5 text-xs">
                   {entry.environmentName}
                 </span>
               ) : null}
-              {!entry.targetKey && !entry.environmentName ? (
+              {!entry.targetLabel && !entry.environmentName ? (
                 <span className="text-muted-foreground">—</span>
               ) : null}
             </TableCell>

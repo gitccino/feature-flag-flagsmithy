@@ -1,6 +1,7 @@
 import { desc, eq } from "drizzle-orm"
 import { cacheTag } from "next/cache"
 
+import { auditPayloadName } from "@/lib/audit-diff"
 import { cacheTags } from "@/lib/cache-tags"
 import { db } from "@/lib/db"
 import { auditLogs, environments, flags } from "@/lib/db/schema"
@@ -86,9 +87,17 @@ export async function listProjectAuditLogs(projectId: string) {
 
   return entries.map((entry) => ({
     ...entry,
-    // Deleted flags resolve to null: the row is gone, so there is no key left
-    // to look up. The delete entry's own `before` diff still carries it.
-    targetKey: flagKeys.get(entry.entityId) ?? null,
+    // Flags resolve by id; everything else falls back to the name in its own
+    // payload. That fallback is what identifies an API key entry: a revoke
+    // leaves name and keyPrefix unchanged, so the changed-fields diff drops
+    // both and the row would otherwise read "revokedAt: — → <date>" with no
+    // indication of which key.
+    //
+    // Deleted flags resolve to null here too and take the same fallback; a
+    // flag delete stores its name, so the row still names what it removed.
+    targetLabel:
+      flagKeys.get(entry.entityId) ??
+      auditPayloadName(entry.before, entry.after),
     environmentName: entry.environmentId
       ? (environmentNames.get(entry.environmentId) ?? null)
       : null,

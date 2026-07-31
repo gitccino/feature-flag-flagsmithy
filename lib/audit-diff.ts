@@ -34,6 +34,25 @@ function fields(value: unknown): Map<string, unknown> {
   return new Map(Object.entries(value))
 }
 
+/**
+ * The name an entry's payload carries for the thing it touched, if any.
+ *
+ * Used for entities the query can't resolve by id: an API key's row is never
+ * deleted but its name lives only in the payload, and a project's own name is
+ * the thing being changed. Reads `after` first so a rename shows the new name,
+ * falling back to `before` for a delete, which has no `after` at all.
+ */
+export function auditPayloadName(
+  before: unknown,
+  after: unknown,
+): string | null {
+  for (const source of [after, before]) {
+    const name = fields(source).get("name")
+    if (typeof name === "string" && name !== "") return name
+  }
+  return null
+}
+
 /** Render one jsonb value as a cell. Absent and null both read as "not set". */
 export function formatAuditValue(value: unknown): string {
   if (value === undefined || value === null) return "—"
