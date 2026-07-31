@@ -136,6 +136,7 @@ export async function createFlag(
     });
 
     updateTag(cacheTags.flags(projectId));
+    updateTag(cacheTags.auditLogs(projectId));
     // New flag adds a state row to every env — bust all of them.
     await Promise.all(data.envIds.map(delEnvConfig));
     return { ok: true, data: { id: data.id, key: data.key } };
@@ -207,6 +208,7 @@ export async function updateFlag(
   });
 
   updateTag(cacheTags.flags(existing.projectId));
+  updateTag(cacheTags.auditLogs(existing.projectId));
   return { ok: true, data };
 }
 
@@ -266,6 +268,7 @@ export async function deleteFlag(
   });
 
   updateTag(cacheTags.flags(existing.projectId));
+  updateTag(cacheTags.auditLogs(existing.projectId));
   // Deleting a flag removes its state from every env — bust all of them.
   await Promise.all(projectEnvironments.map((env) => delEnvConfig(env.id)));
   return { ok: true, data: { id: flagId } };
@@ -333,6 +336,7 @@ export async function setFlagEnvironmentState(
   });
 
   updateTag(cacheTags.flags(existing.flag.projectId));
+  updateTag(cacheTags.auditLogs(existing.flag.projectId));
   await delEnvConfig(existing.environmentId);
   return { ok: true, data };
 }

@@ -6,4 +6,5 @@ export const cacheTags = {
   projects: (userId: string) => `projects:user:${userId}`,
   flags: (projectId: string) => `flags:project:${projectId}`,
   apiKeys: (projectId: string) => `api-keys:project:${projectId}`,
-} as const;
+  auditLogs: (projectId: string) => `audit-logs:project:${projectId}`,
+} as const

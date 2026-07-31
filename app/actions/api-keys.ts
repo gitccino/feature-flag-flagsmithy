@@ -120,6 +120,7 @@ export async function createApiKey(
   }
 
   updateTag(cacheTags.apiKeys(environment.projectId));
+  updateTag(cacheTags.auditLogs(environment.projectId));
 
   return { ok: true, data: { id: data.id, keyPrefix, plaintext } };
 }
@@ -210,6 +211,7 @@ export async function revokeApiKey(
   }
 
   updateTag(cacheTags.apiKeys(environment.projectId));
+  updateTag(cacheTags.auditLogs(environment.projectId));
 
   return { ok: true, data: { id: apiKeyId } };
 }
